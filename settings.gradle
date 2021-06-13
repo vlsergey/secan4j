@@ -1,0 +1,4 @@
+rootProject.name = 'secan4j'
+include 'secan4j-annotations'
+include 'secan4j-core'
+include 'secan4j-data'

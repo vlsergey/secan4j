@@ -1,0 +1,19 @@
+plugins {
+    id 'eclipse'
+    id 'java'
+    id 'java-library'
+}
+
+eclipse {
+  jdt {
+    sourceCompatibility = 11
+    targetCompatibility = 11
+  }
+}
+
+dependencies {
+}
+
+compileJava {
+    options.release = 11
+}
