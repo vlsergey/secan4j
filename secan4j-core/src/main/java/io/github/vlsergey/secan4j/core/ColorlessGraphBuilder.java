@@ -33,7 +33,7 @@ import lombok.Setter;
 import lombok.SneakyThrows;
 import lombok.ToString;
 
-public class GraphBuilder {
+public class ColorlessGraphBuilder {
 
 	@AllArgsConstructor
 	@Data
@@ -68,6 +68,8 @@ public class GraphBuilder {
 			this.description = description;
 		}
 	}
+
+	static final DataNode CONST_NULL = new DataNode("null");
 
 	static final DataNode CONST_INT_0 = new DataNode("int 0");
 
@@ -142,6 +144,14 @@ public class GraphBuilder {
 		while (iterator.hasNext() && (index = iterator.next()) < firstPos + length) {
 			int op = iterator.byteAt(index);
 			switch (op) {
+			case Opcode.ACONST_NULL:
+				currentStack.push(CONST_NULL);
+				break;
+
+			case Opcode.ALOAD:
+				currentStack.push(currentLocalNodes[iterator.byteAt(index + 1)]);
+				break;
+
 			case Opcode.ALOAD_0:
 			case Opcode.ALOAD_1:
 			case Opcode.ALOAD_2:
@@ -152,6 +162,10 @@ public class GraphBuilder {
 			case Opcode.ARETURN:
 				// expected to be last of the instructions
 				toReturn = currentStack.pop();
+				break;
+
+			case Opcode.ASTORE:
+				currentLocalNodes[iterator.byteAt(index + 1)] = currentStack.pop();
 				break;
 
 			case Opcode.ASTORE_0:
@@ -170,6 +184,16 @@ public class GraphBuilder {
 			case Opcode.DUP:
 				currentStack.push(currentStack.peek());
 				break;
+
+			case Opcode.GETFIELD: {
+				final int constantIndex = iterator.u16bitAt(index + 1);
+				final String fieldrefName = constPool.getFieldrefName(constantIndex);
+
+				DataNode result = new DataNode("gitfield " + fieldrefName);
+				result.inputs = new DataNode[] { currentStack.poll() };
+
+				currentStack.push(result);
+			}
 
 			case Opcode.ICONST_0:
 				currentStack.push(CONST_INT_0);
@@ -212,6 +236,7 @@ public class GraphBuilder {
 				break;
 
 			case Opcode.INVOKEDYNAMIC:
+			case Opcode.INVOKEINTERFACE:
 			case Opcode.INVOKESPECIAL:
 			case Opcode.INVOKESTATIC:
 			case Opcode.INVOKEVIRTUAL: {
