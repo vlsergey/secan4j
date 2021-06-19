@@ -36,12 +36,15 @@ dependencies {
     implementation group: 'org.javassist', name: 'javassist', version: '3.28.0-GA'
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.31'
 
-    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+    testAnnotationProcessor group: 'org.projectlombok', name: 'lombok', version: lombokVersion
+    testCompileOnly group: 'org.projectlombok', name: 'lombok', version: lombokVersion
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.7.2")
-    testImplementation group: 'org.springframework', name: 'spring-web', version: '5.3.8';
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.7.2")
+    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.7.2'
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.7.2'
+    testImplementation group: 'org.springframework', name: 'spring-web', version: '5.3.8'
+
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.7.2'
 }
 
 compileJava {
