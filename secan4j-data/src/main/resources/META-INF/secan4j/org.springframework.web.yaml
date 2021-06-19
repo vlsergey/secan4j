@@ -1,0 +1,5 @@
+bind:
+  annotation:
+    CookieValue: UserProvided
+    RequestParam: UserProvided
+    RequestHeader: UserProvided

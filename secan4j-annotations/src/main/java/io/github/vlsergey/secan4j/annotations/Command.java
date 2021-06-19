@@ -17,4 +17,6 @@ import java.lang.annotation.Target;
 @Target({ FIELD, PARAMETER, METHOD })
 public @interface Command {
 
+    OnIntersection value() default OnIntersection.REPORT;
+
 }

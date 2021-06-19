@@ -1,6 +1,9 @@
-package io.github.vlsergey.secan4j.core.springwebmvc;
+package io.github.vlsergey.secan4j.core.colorless;
 
 import java.util.Random;
+
+import io.github.vlsergey.secan4j.annotations.Command;
+import io.github.vlsergey.secan4j.annotations.UserProvided;
 
 public class SimpleMethods {
 

@@ -1,4 +1,6 @@
-package io.github.vlsergey.secan4j.core;
+package io.github.vlsergey.secan4j.core.colorless;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.Arrays;
 import java.util.function.Function;
@@ -9,7 +11,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.github.vlsergey.secan4j.core.springwebmvc.BadControllerExample;
-import io.github.vlsergey.secan4j.core.springwebmvc.SimpleMethods;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -28,7 +29,8 @@ class ColorlessGraphBuilderTest {
 			}
 		};
 
-		return Stream.of(BadControllerExample.class, SimpleMethods.class) //
+		return Stream
+				.of(BadControllerExample.class, PrivateMethodInvoke.Foo.class, SimpleMethods.class, StringBuilder.class) //
 				.map(toCtClass) //
 				.flatMap(ctClass -> Arrays.stream(ctClass.getMethods())
 						.map(ctMethod -> Arguments.of(ctClass, ctMethod)));
@@ -38,7 +40,8 @@ class ColorlessGraphBuilderTest {
 	@ParameterizedTest
 	@MethodSource("provideMethods")
 	void testBuildGraph(CtClass ctClass, CtMethod ctMethod) throws Exception {
-		new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
+		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
+		assertNotNull((graph == null) == ctMethod.isEmpty());
 	}
 
 }

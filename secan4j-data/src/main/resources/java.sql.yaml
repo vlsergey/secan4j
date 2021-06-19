@@ -1,6 +1,0 @@
-java:
-  sql:
-    Connection:
-      prepareStatement:
-        arguments:
-          - Command

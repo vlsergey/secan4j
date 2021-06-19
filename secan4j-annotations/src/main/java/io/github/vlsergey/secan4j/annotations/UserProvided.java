@@ -18,4 +18,6 @@ import java.lang.annotation.Target;
 @Target({ FIELD, PARAMETER, METHOD })
 public @interface UserProvided {
 
+    OnIntersection value() default OnIntersection.REPORT;
+
 }
