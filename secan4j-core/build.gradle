@@ -4,6 +4,10 @@ plugins {
     id 'java-library'
 }
 
+ext {
+    lombokVersion = '1.18.12'
+}
+
 eclipse {
   jdt {
     sourceCompatibility = 11
@@ -11,8 +15,8 @@ eclipse {
   }
 }
 
-ext {
-    lombokVersion = '1.18.12'
+compileJava {
+    options.release = 11
 }
 
 repositories {
