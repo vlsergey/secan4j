@@ -2,14 +2,15 @@ package io.github.vlsergey.secan4j.core.colorless;
 
 import java.util.Random;
 
-import io.github.vlsergey.secan4j.annotations.Command;
-import io.github.vlsergey.secan4j.annotations.UserProvided;
-
 public class SimpleMethods {
 
 	public String simpleReturn(String src) {
 		final String result = src;
 		return result;
+	}
+
+	public static String xOrNull(Object x) {
+		return x != null ? x.toString() : "null";
 	}
 
 	public String whileWithRandom() {

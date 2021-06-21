@@ -1,47 +1,34 @@
 package io.github.vlsergey.secan4j.core.colorless;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Arrays;
-import java.util.function.Function;
-import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import io.github.vlsergey.secan4j.core.springwebmvc.BadControllerExample;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
-import javassist.NotFoundException;
+import javassist.bytecode.analysis.Type;
 
 class ColorlessGraphBuilderTest {
 
-	private static Stream<Arguments> provideMethods() throws Exception {
-		final ClassPool classPool = ClassPool.getDefault();
+	private final ClassPool classPool = ClassPool.getDefault();
 
-		final Function<Class<?>, CtClass> toCtClass = cls -> {
-			try {
-				return classPool.getCtClass(cls.getName());
-			} catch (NotFoundException exc) {
-				throw new RuntimeException(exc);
-			}
-		};
+	@Test
+	void testStringValueOf() throws Exception {
+		final CtClass ctClass = classPool.get(SimpleMethods.class.getName());
+		final CtMethod ctMethod = ctClass.getDeclaredMethod("xOrNull");
 
-		return Stream
-				.of(BadControllerExample.class, PrivateMethodInvoke.Foo.class, SimpleMethods.class, StringBuilder.class) //
-				.map(toCtClass) //
-				.flatMap(ctClass -> Arrays.stream(ctClass.getMethods())
-						.map(ctMethod -> Arguments.of(ctClass, ctMethod)));
-
-	}
-
-	@ParameterizedTest
-	@MethodSource("provideMethods")
-	void testBuildGraph(CtClass ctClass, CtMethod ctMethod) throws Exception {
 		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
-		assertNotNull((graph == null) == ctMethod.isEmpty());
+		System.out.println(graph);
+
+		assertEquals(1, graph.getMethodParamNodes().length);
+		assertEquals(Type.get(classPool.get(Object.class.getName())), graph.getMethodParamNodes()[0].type);
+
+		assertEquals(1, graph.getMethodReturnNodes().length);
+		assertTrue(graph.getMethodReturnNodes()[0] instanceof AnyOfNode);
+		assertEquals(Type.get(classPool.get(String.class.getName())), graph.getMethodReturnNodes()[0].type);
+		assertEquals(2, graph.getMethodReturnNodes()[0].inputs.length);
 	}
 
 }

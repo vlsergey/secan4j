@@ -102,7 +102,8 @@ public class ColorlessGraphExported {
 					}
 
 					final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
-					if (graph == null || (graph.getOutReturns().length == 0 && graph.getInvokations().length == 0))
+					if (graph == null
+							|| (graph.getMethodReturnNodes().length == 0 && graph.getInvokations().length == 0))
 						continue;
 
 					System.out.println();
@@ -195,7 +196,7 @@ public class ColorlessGraphExported {
 				Arrays.asList(eventFactory.createAttribute("edgedefault", "directed")).iterator(), null));
 
 		final HashMap<DataNode, String> nodeToId = new HashMap<>();
-		for (DataNode outs : graph.getOutReturns()) {
+		for (DataNode outs : graph.getMethodReturnNodes()) {
 			dumpWithIncomings(nodeToId, outs, writer);
 		}
 

@@ -134,6 +134,14 @@ public class ColorlessGraphBuilder {
 				.toArray(arrayGenerator);
 	}
 
+	private static Type getMergedType(DataNode[] dataNodes) {
+		Type result = dataNodes[0].type;
+		for (int i = 1; i < dataNodes.length; i++) {
+			result = result.merge(dataNodes[i].type);
+		}
+		return result;
+	}
+
 	private static void processInstructionWithStackOnly(final @NonNull ConstPool constPool,
 			final @NonNull CodeIterator iterator, final int index, final @NonNull Deque<DataNode> currentStack,
 			final int toPoll, final @NonNull Supplier<Type> typeOfNextStackTop) {
@@ -196,13 +204,15 @@ public class ColorlessGraphBuilder {
 		final DataNode[] allNodes = collect(doneGraphs, BlockDataGraph::getAllNodes, DataNode[]::new);
 		final DataNode[] outputs = collect(doneGraphs, BlockDataGraph::getOutReturns, DataNode[]::new);
 		final Invocation[] invokations = collect(doneGraphs, BlockDataGraph::getInvokations, Invocation[]::new);
+		final DataNode[] methodReturnNodes = outputs.length < 2 ? outputs
+				: new DataNode[] { new AnyOfNode().setInputs(outputs).setType(getMergedType(outputs)) };
 		final PutFieldNode[] putFieldNodes = collect(doneGraphs, BlockDataGraph::getPutFieldNodes, PutFieldNode[]::new);
 		final PutStaticNode[] putStaticNodes = collect(doneGraphs, BlockDataGraph::getPutStaticNodes,
 				PutStaticNode[]::new);
 
 		return new BlockDataGraph(allNodes, incLocalNodes, EMPTY_STACK, invokations,
-				methodParams.toArray(DataNode[]::new), outputs, DataNode.EMPTY_DATA_NODES, outputs, EMPTY_STACK,
-				putFieldNodes, putStaticNodes);
+				methodParams.toArray(DataNode[]::new), methodReturnNodes, DataNode.EMPTY_DATA_NODES, outputs,
+				EMPTY_STACK, putFieldNodes, putStaticNodes);
 	}
 
 	@SneakyThrows
