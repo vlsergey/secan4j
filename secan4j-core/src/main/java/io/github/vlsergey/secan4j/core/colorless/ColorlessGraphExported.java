@@ -217,7 +217,7 @@ public class ColorlessGraphExported {
 	private void writeInvokations(BlockDataGraph graph, XMLEventWriter writer, final HashMap<DataNode, String> nodeToId)
 			throws XMLStreamException {
 		int counter = 0;
-		for (Invokation invokation : graph.getInvokations()) {
+		for (Invocation invokation : graph.getInvokations()) {
 			final String id = "invokation" + (counter++);
 
 			writer.add(eventFactory.createStartElement(QNAME_NODE,

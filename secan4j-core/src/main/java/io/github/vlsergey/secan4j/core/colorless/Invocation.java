@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class Invokation {
+public class Invocation {
 	private final String className;
 	private final String methodName;
 	private final String methodSignature;

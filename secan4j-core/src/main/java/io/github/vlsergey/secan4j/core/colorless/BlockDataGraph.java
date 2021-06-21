@@ -11,7 +11,9 @@ public class BlockDataGraph {
 	private final DataNode[] allNodes;
 	private final DataNode[] incLocalNodes;
 	private final Deque<DataNode> incStackNodes;
-	private final Invokation[] invokations;
+	private final Invocation[] invokations;
+	private final DataNode[] methodParamNodes;
+	private final DataNode[] methodReturnNodes;
 	private final DataNode[] outLocalNodes;
 	private final DataNode[] outReturns;
 	private final Deque<DataNode> outStackNodes;

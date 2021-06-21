@@ -5,6 +5,7 @@ import static java.util.Collections.unmodifiableCollection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -77,8 +78,8 @@ public class ColorlessGraphBuilder {
 		assert that != null;
 		assert assignableFrom != null;
 
-		assert Type.get(that).isAssignableFrom(assignableFrom) : "Class " + that + " not assignable from "
-				+ assignableFrom;
+		assert Type.get(that).isAssignableFrom(assignableFrom)
+				: "Class " + that + " not assignable from " + assignableFrom;
 	}
 
 	private static void assertAssignableFrom(Type that, CtClass assignableFrom) throws NotFoundException {
@@ -90,14 +91,14 @@ public class ColorlessGraphBuilder {
 			return;
 		}
 
-		assert that.isAssignableFrom(Type.get(assignableFrom)) : "Class " + that + " not assignable from "
-				+ assignableFrom;
+		assert that.isAssignableFrom(Type.get(assignableFrom))
+				: "Class " + that + " not assignable from " + assignableFrom;
 	}
 
 	static void assertIntAlike(DataNode dataNode) {
 		final Type actual = dataNode.type;
-		assert actual == Type.BYTE || actual == Type.CHAR || actual == Type.INTEGER : "Expected int-alike, but found "
-				+ actual;
+		assert actual == Type.BYTE || actual == Type.CHAR || actual == Type.INTEGER
+				: "Expected int-alike, but found " + actual;
 	}
 
 	static void assertSameSizeOnFrameStack(Deque<DataNode> actual, Frame expected) {
@@ -107,9 +108,8 @@ public class ColorlessGraphBuilder {
 		}
 
 		int topIndex = expected.getTopIndex();
-		assert actual.stream().map(DataNode::getType).mapToInt(Type::getSize)
-				.sum() == (topIndex + 1) : "Size of DataNode stack is "
-						+ actual.stream().map(DataNode::getType).mapToInt(Type::getSize).sum()
+		assert actual.stream().map(DataNode::getType).mapToInt(Type::getSize).sum() == (topIndex + 1)
+				: "Size of DataNode stack is " + actual.stream().map(DataNode::getType).mapToInt(Type::getSize).sum()
 						+ ", but expected size was " + (topIndex + 1);
 	}
 
@@ -167,17 +167,19 @@ public class ColorlessGraphBuilder {
 
 		final DataNode[] incLocalNodes = new DataNode[rootFrame.localsLength()];
 
+		List<DataNode> methodParams = new ArrayList<>();
+
 		int counter = 0;
 		if (!Modifier.isStatic(ctMethod.getModifiers())) {
 			assertAssignableFrom(ctMethod.getDeclaringClass(), rootFrame.getLocal(counter));
-			incLocalNodes[counter] = new DataNode("this").setType(Type.get(ctClass));
+			methodParams.add(incLocalNodes[counter] = new DataNode("this").setType(Type.get(ctClass)));
 			counter += rootFrame.getLocal(counter).getSize();
 		}
 
 		final CtClass[] parameterTypes = ctMethod.getParameterTypes();
 		for (int i = 0; i < parameterTypes.length; i++) {
 			assertAssignableFrom(rootFrame.getLocal(counter), parameterTypes[i]);
-			incLocalNodes[counter] = new MethodParameterNode(ctClass, ctMethod, i);
+			methodParams.add(incLocalNodes[counter] = new MethodParameterNode(ctClass, ctMethod, i));
 			counter += rootFrame.getLocal(counter).getSize();
 		}
 
@@ -193,13 +195,14 @@ public class ColorlessGraphBuilder {
 		final Collection<BlockDataGraph> doneGraphs = done.values();
 		final DataNode[] allNodes = collect(doneGraphs, BlockDataGraph::getAllNodes, DataNode[]::new);
 		final DataNode[] outputs = collect(doneGraphs, BlockDataGraph::getOutReturns, DataNode[]::new);
-		final Invokation[] invokations = collect(doneGraphs, BlockDataGraph::getInvokations, Invokation[]::new);
+		final Invocation[] invokations = collect(doneGraphs, BlockDataGraph::getInvokations, Invocation[]::new);
 		final PutFieldNode[] putFieldNodes = collect(doneGraphs, BlockDataGraph::getPutFieldNodes, PutFieldNode[]::new);
 		final PutStaticNode[] putStaticNodes = collect(doneGraphs, BlockDataGraph::getPutStaticNodes,
 				PutStaticNode[]::new);
 
-		return new BlockDataGraph(allNodes, incLocalNodes, EMPTY_STACK, invokations, DataNode.EMPTY_DATA_NODES, outputs,
-				EMPTY_STACK, putFieldNodes, putStaticNodes);
+		return new BlockDataGraph(allNodes, incLocalNodes, EMPTY_STACK, invokations,
+				methodParams.toArray(DataNode[]::new), outputs, DataNode.EMPTY_DATA_NODES, outputs, EMPTY_STACK,
+				putFieldNodes, putStaticNodes);
 	}
 
 	@SneakyThrows
@@ -218,7 +221,7 @@ public class ColorlessGraphBuilder {
 		final Deque<DataNode> currentStack = new LinkedList<>(incStack);
 
 		DataNode toReturn = null;
-		List<Invokation> invokations = new ArrayList<>();
+		List<Invocation> invokations = new ArrayList<>();
 		List<PutFieldNode> putFieldNodes = new ArrayList<>();
 		List<PutStaticNode> putStaticNodes = new ArrayList<>();
 
@@ -315,8 +318,9 @@ public class ColorlessGraphBuilder {
 		allNodesSet.addAll(currentStack);
 		final DataNode[] allNodes = allNodesSet.toArray(DataNode[]::new);
 
-		return new BlockDataGraph(allNodes, incLocalNodes, incStack, invokations.toArray(Invokation[]::new),
-				currentLocals, toReturn == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { toReturn }, currentStack,
+		return new BlockDataGraph(allNodes, incLocalNodes, incStack, invokations.toArray(Invocation[]::new),
+				DataNode.EMPTY_DATA_NODES, DataNode.EMPTY_DATA_NODES, currentLocals,
+				toReturn == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { toReturn }, currentStack,
 				putFieldNodes.toArray(PutFieldNode[]::new), putStaticNodes.toArray(PutStaticNode[]::new));
 	}
 
@@ -380,7 +384,7 @@ public class ColorlessGraphBuilder {
 	@SneakyThrows
 	private DataNode processInstruction(final ClassPool classPool, final ConstPool constPool, final Heap heap,
 			final DataNode[] currentLocals, final Deque<DataNode> currentStack, DataNode toReturn,
-			List<Invokation> invokations, List<PutFieldNode> putFieldNodes, List<PutStaticNode> putStaticNodes,
+			List<Invocation> invokations, List<PutFieldNode> putFieldNodes, List<PutStaticNode> putStaticNodes,
 			final CodeIterator iterator, int index, Supplier<Type> typeOfNextStackTop) {
 
 		int op = iterator.byteAt(index);
@@ -420,6 +424,10 @@ public class ColorlessGraphBuilder {
 			final DataNode toThrow = currentStack.peek();
 			currentStack.clear();
 			currentStack.push(toThrow);
+			break;
+
+		case Opcode.BIPUSH:
+			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 0, typeOfNextStackTop);
 			break;
 
 		case Opcode.CHECKCAST:
@@ -596,6 +604,7 @@ public class ColorlessGraphBuilder {
 			for (int i = 0; i < params.length; i++) {
 				inputs.add(currentStack.pop());
 			}
+			Collections.reverse(inputs);
 			final DataNode[] inputsArray = inputs.toArray(new DataNode[inputs.size()]);
 
 			DataNode result = null;
@@ -607,7 +616,7 @@ public class ColorlessGraphBuilder {
 				currentStack.push(result);
 			}
 
-			invokations.add(new Invokation(className, methodName, signature, inputsArray, result));
+			invokations.add(new Invocation(className, methodName, signature, inputsArray, result));
 			break;
 		}
 
@@ -693,6 +702,9 @@ public class ColorlessGraphBuilder {
 
 		case Opcode.NEW:
 			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 0, typeOfNextStackTop);
+			break;
+		case Opcode.NEWARRAY:
+			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
 			break;
 
 		case Opcode.POP: {
