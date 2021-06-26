@@ -1,6 +1,6 @@
 package io.github.vlsergey.secan4j.core.session;
 
-import io.github.vlsergey.secan4j.core.colored.PathToClassesAndColor;
+import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import javassist.CtBehavior;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,8 +19,8 @@ class PaintingTask implements Comparable<PaintingTask>, Runnable {
 	}
 
 	private final @NonNull CtBehavior ctMethod;
-	private final PathToClassesAndColor[] paintedIns;
-	private final PathToClassesAndColor[] paintedOuts;
+	private final ColoredObject[] paintedIns;
+	private final ColoredObject[] paintedOuts;
 
 	@Exclude
 	private final long priority;

@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 
+import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colored.GraphColorer;
-import io.github.vlsergey.secan4j.core.colored.PathToClassesAndColor;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
@@ -54,14 +54,14 @@ public class PaintingSession {
 
 	private final @NonNull GraphColorer graphColorer;
 
-	private final @NonNull Map<PaintingTask, List<PaintingTask>> listeners = new HashMap<PaintingTask, List<PaintingTask>>();
+	private final @NonNull Map<PaintingTask, List<PaintingTask>> listeners = new HashMap<>();
 
 	private final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection;
 
 	private final WeakHashMap<PaintingTask, QueuedTask> queued = new WeakHashMap<>();
 
 	// replace with quite big cache?
-	private final @NonNull Map<PaintingTask, PaintingTaskResult> results = new ConcurrentHashMap<PaintingTask, PaintingTaskResult>();
+	private final @NonNull Map<PaintingTask, PaintingTaskResult> results = new ConcurrentHashMap<>();
 
 	public PaintingSession(final @NonNull ClassPool classPool,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
@@ -74,7 +74,7 @@ public class PaintingSession {
 
 			@Override
 			protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
-				return new ComparableFutureTask<T>((PaintingTask) runnable, value);
+				return new ComparableFutureTask<>((PaintingTask) runnable, value);
 			}
 
 		};
@@ -111,8 +111,8 @@ public class PaintingSession {
 			final @NonNull CtClass ctClass = task.getCtMethod().getDeclaringClass();
 
 			final long usedHeapVersion = currentHeapVersion.get();
-			Optional<PathToClassesAndColor[][]> opUpdated = graphColorer.color(ctClass, task.getCtMethod(), task.getPaintedIns(),
-					task.getPaintedOuts(), (subInvokation, ins, outs) -> {
+			Optional<ColoredObject[][]> opUpdated = graphColorer.color(ctClass, task.getCtMethod(),
+					task.getPaintedIns(), task.getPaintedOuts(), (subInvokation, ins, outs) -> {
 						if (task.getCtMethod().isEmpty()) {
 							// virtual, so far ignore
 							return emptyMap();
@@ -133,7 +133,7 @@ public class PaintingSession {
 				log.warn("No results for deeper travel to {}", task.getCtMethod());
 				return;
 			}
-			final @NonNull PathToClassesAndColor[][] updated = opUpdated.get();
+			final @NonNull ColoredObject[][] updated = opUpdated.get();
 
 			final PaintingTaskResult prevResults = results.get(task);
 			if (prevResults == null || !Arrays.equals(prevResults.getPaintedIns(), updated[0])
@@ -167,8 +167,8 @@ public class PaintingSession {
 		}
 	}
 
-	public void queue(Invocation invocation, PathToClassesAndColor[] paintedIns, PathToClassesAndColor[] paintedOuts, long priority,
-			PaintingTask toInvokeAfter) throws NotFoundException {
+	public void queue(Invocation invocation, ColoredObject[] paintedIns, ColoredObject[] paintedOuts,
+			long priority, PaintingTask toInvokeAfter) throws NotFoundException {
 
 		CtClass invClass = classPool.get(invocation.getClassName());
 		CtBehavior invMethod = invocation.getMethodName().equals("<init>")

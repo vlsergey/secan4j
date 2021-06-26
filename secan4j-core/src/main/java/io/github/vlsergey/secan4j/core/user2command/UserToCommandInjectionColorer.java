@@ -10,8 +10,8 @@ import com.google.common.reflect.TypeToken;
 import io.github.vlsergey.secan4j.annotations.Command;
 import io.github.vlsergey.secan4j.annotations.UserProvided;
 import io.github.vlsergey.secan4j.core.colored.ColorProvider;
+import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colored.Confidence;
-import io.github.vlsergey.secan4j.core.colored.PathToClassesAndColor;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.data.DataProvider;
 import io.github.vlsergey.secan4j.data.SecanData;
@@ -65,7 +65,7 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 
 	@Override
 	@SneakyThrows
-	public @NonNull Optional<PathToClassesAndColor> getImplicitColor(CtClass ctClass, CtBehavior ctMethod, int parameterIndex) {
+	public @NonNull Optional<ColoredObject> getImplicitColor(CtClass ctClass, CtBehavior ctMethod, int parameterIndex) {
 		final CtClass parameterType = ctMethod.getParameterTypes()[parameterIndex];
 
 		for (Object ann : ctMethod.getParameterAnnotations()[parameterIndex]) {
@@ -73,12 +73,12 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 				final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 						"Annotation @Command on");
 
-				return Optional.of(PathToClassesAndColor.sinkOnRoot(src, parameterType, Confidence.EXPLICITLY));
+				return Optional.of(ColoredObject.sinkOnRoot(src, parameterType, Confidence.EXPLICITLY));
 			} else if (ann instanceof UserProvided) {
 				final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 						"Annotation @UserProvided on");
 
-				return Optional.of(PathToClassesAndColor.sourceOnRoot(src, parameterType, Confidence.EXPLICITLY));
+				return Optional.of(ColoredObject.sourceOnRoot(src, parameterType, Confidence.EXPLICITLY));
 			}
 
 			// check if this annotation is configured to be source or sink
@@ -89,11 +89,11 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 				if (forAnnotation.contains(Command.class)) {
 					final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 							"Annotation @" + annClass.getSimpleName() + " configured as @Command on");
-					return Optional.of(PathToClassesAndColor.sinkOnRoot(src, parameterType, Confidence.CONFIGURATION));
+					return Optional.of(ColoredObject.sinkOnRoot(src, parameterType, Confidence.CONFIGURATION));
 				} else if (forAnnotation.contains(UserProvided.class)) {
 					final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 							"Annotation @" + annClass.getSimpleName() + " configured as @UserProvided on");
-					return Optional.of(PathToClassesAndColor.sourceOnRoot(src, parameterType, Confidence.CONFIGURATION));
+					return Optional.of(ColoredObject.sourceOnRoot(src, parameterType, Confidence.CONFIGURATION));
 				}
 			}
 		}
@@ -106,9 +106,9 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 					"Configuration info for");
 
 			if (data.contains(Command.class)) {
-				return Optional.of(PathToClassesAndColor.sinkOnRoot(src, parameterType, Confidence.CONFIGURATION));
+				return Optional.of(ColoredObject.sinkOnRoot(src, parameterType, Confidence.CONFIGURATION));
 			} else if (data.contains(UserProvided.class)) {
-				return Optional.of(PathToClassesAndColor.sourceOnRoot(src, parameterType, Confidence.CONFIGURATION));
+				return Optional.of(ColoredObject.sourceOnRoot(src, parameterType, Confidence.CONFIGURATION));
 			}
 		}
 

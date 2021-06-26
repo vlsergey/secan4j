@@ -22,7 +22,6 @@ import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
 import javassist.CtField;
-import javassist.CtPrimitiveType;
 import javassist.Modifier;
 import javassist.NotFoundException;
 import javassist.bytecode.BadBytecode;
@@ -666,7 +665,7 @@ public class ColorlessGraphBuilder {
 			final DataNode[] inputsArray = inputs.toArray(new DataNode[inputs.size()]);
 
 			DataNode result = null;
-			if (!CtPrimitiveType.voidType.equals(retType)) {
+			if (!CtClass.voidType.equals(retType)) {
 				result = new DataNode("result of invoke");
 				result.inputs = inputsArray;
 				result.operation = op;

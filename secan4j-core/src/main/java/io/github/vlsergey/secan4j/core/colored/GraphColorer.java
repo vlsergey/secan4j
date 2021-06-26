@@ -48,7 +48,7 @@ public class GraphColorer {
 	@Data
 	private static final class InitialColoredMethodGraph {
 		private final BlockDataGraph colorlessGraph;
-		private final Map<DataNode, PathToClassesAndColor> initialColors;
+		private final Map<DataNode, ColoredObject> initialColors;
 		private final DataNode[] methodParams;
 		private final DataNode[] methodReturns;
 	}
@@ -61,11 +61,11 @@ public class GraphColorer {
 		}
 		final @NonNull BlockDataGraph colorlessGraph = opColorlessGraph.get();
 
-		final Map<DataNode, PathToClassesAndColor> colors = new HashMap<>();
+		final Map<DataNode, ColoredObject> colors = new HashMap<>();
 		for (final @NonNull DataNode dataNode : colorlessGraph.getAllNodes()) {
 			if (dataNode instanceof MethodParameterNode) {
 				final @NonNull MethodParameterNode typed = ((MethodParameterNode) dataNode);
-				final @NonNull Optional<PathToClassesAndColor> opColor = colorProvider.getImplicitColor(typed.getCtClass(),
+				final @NonNull Optional<ColoredObject> opColor = colorProvider.getImplicitColor(typed.getCtClass(),
 						typed.getCtMethod(), typed.getParameterIndex());
 				opColor.ifPresent(color -> {
 					if (log.isDebugEnabled()) {
@@ -100,7 +100,7 @@ public class GraphColorer {
 
 				for (int i = 0; i < invTargetMethod.getParameterTypes().length; i++) {
 					final DataNode dataNode = invokation.getParameters()[i];
-					final @NonNull Optional<PathToClassesAndColor> opColor = colorProvider.getImplicitColor(invTargetClass,
+					final @NonNull Optional<ColoredObject> opColor = colorProvider.getImplicitColor(invTargetClass,
 							invTargetMethod, i);
 					opColor.ifPresent(color -> {
 						if (log.isDebugEnabled()) {
@@ -124,13 +124,13 @@ public class GraphColorer {
 
 	public interface InvocationCallback {
 		@NonNull
-		Map<DataNode, PathToClassesAndColor> onInvokation(final @NonNull Invocation invocation,
-				final @NonNull PathToClassesAndColor[] ins, final @NonNull PathToClassesAndColor[] outs);
+		Map<DataNode, ColoredObject> onInvokation(final @NonNull Invocation invocation,
+				final @NonNull ColoredObject[] ins, final @NonNull ColoredObject[] outs);
 	}
 
 	@SneakyThrows
-	public @NonNull Optional<PathToClassesAndColor[][]> color(final @NonNull CtClass ctClass, final @NonNull CtBehavior ctMethod,
-			final PathToClassesAndColor[] ins, final PathToClassesAndColor[] outs, final @NonNull InvocationCallback invocationCallback,
+	public @NonNull Optional<ColoredObject[][]> color(final @NonNull CtClass ctClass, final @NonNull CtBehavior ctMethod,
+			final ColoredObject[] ins, final ColoredObject[] outs, final @NonNull InvocationCallback invocationCallback,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 
 		final @NonNull Optional<InitialColoredMethodGraph> opInitial = buildInitialColoredMethodGraph(ctClass,
@@ -141,22 +141,22 @@ public class GraphColorer {
 		final @NonNull InitialColoredMethodGraph initial = opInitial.get();
 
 		final BlockDataGraph colorlessGraph = initial.getColorlessGraph();
-		final Map<DataNode, PathToClassesAndColor> colors = new HashMap<>(initial.getInitialColors());
+		final Map<DataNode, ColoredObject> colors = new HashMap<>(initial.getInitialColors());
 
 		updateInsOutsColors(ins, initial.getMethodParams(), colors);
 		updateInsOutsColors(outs, initial.getMethodReturns(), colors);
 
 		colorImpl(colorlessGraph, colors, invocationCallback, onSourceSinkIntersection);
 
-		final PathToClassesAndColor[] newIns = Arrays.stream(initial.getMethodParams()).map(colors::get)
-				.toArray(PathToClassesAndColor[]::new);
-		final PathToClassesAndColor[] newOuts = Arrays.stream(initial.getMethodReturns()).map(colors::get)
-				.toArray(PathToClassesAndColor[]::new);
-		return Optional.of(new PathToClassesAndColor[][] { newIns, newOuts });
+		final ColoredObject[] newIns = Arrays.stream(initial.getMethodParams()).map(colors::get)
+				.toArray(ColoredObject[]::new);
+		final ColoredObject[] newOuts = Arrays.stream(initial.getMethodReturns()).map(colors::get)
+				.toArray(ColoredObject[]::new);
+		return Optional.of(new ColoredObject[][] { newIns, newOuts });
 	}
 
-	private void updateInsOutsColors(final PathToClassesAndColor[] sourceOfNewColors, final DataNode[] whatToUpdate,
-			final @NonNull Map<DataNode, PathToClassesAndColor> colors) {
+	private void updateInsOutsColors(final ColoredObject[] sourceOfNewColors, final DataNode[] whatToUpdate,
+			final @NonNull Map<DataNode, ColoredObject> colors) {
 		if (sourceOfNewColors == null) {
 			return;
 		}
@@ -168,13 +168,13 @@ public class GraphColorer {
 				continue;
 			}
 			DataNode node = whatToUpdate[i];
-			PathToClassesAndColor existed = colors.get(node);
+			ColoredObject existed = colors.get(node);
 			if (existed == null) {
 				colors.put(node, sourceOfNewColors[i]);
 				continue;
 			}
 
-			PathToClassesAndColor toStore = PathToClassesAndColor.merge(existed, sourceOfNewColors[i], (a, b) -> {
+			ColoredObject toStore = ColoredObject.merge(existed, sourceOfNewColors[i], (a, b) -> {
 				throw new RuntimeException("Intersection!");
 			});
 			if (toStore != existed) {
@@ -184,21 +184,21 @@ public class GraphColorer {
 	}
 
 	private void colorImpl(final @NonNull BlockDataGraph colorlessGraph,
-			final @NonNull Map<DataNode, PathToClassesAndColor> colors, final @NonNull InvocationCallback invocationCallback,
+			final @NonNull Map<DataNode, ColoredObject> colors, final @NonNull InvocationCallback invocationCallback,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 		// initial colors are assigned, now time to color nodes...
 		boolean hasChanges = true;
 		while (hasChanges) {
 			// TODO: optimize by checking only changed nodes
-			final Map<DataNode, PathToClassesAndColor> newColors = new HashMap<>();
+			final Map<DataNode, ColoredObject> newColors = new HashMap<>();
 
 			for (Invocation invocation : colorlessGraph.getInvokations()) {
-				final @NonNull PathToClassesAndColor[] args = Arrays.stream(invocation.getParameters()).map(colors::get)
-						.toArray(PathToClassesAndColor[]::new);
-				final @NonNull PathToClassesAndColor[] results = new PathToClassesAndColor[] { colors.get(invocation.getResult()) };
+				final @NonNull ColoredObject[] args = Arrays.stream(invocation.getParameters()).map(colors::get)
+						.toArray(ColoredObject[]::new);
+				final @NonNull ColoredObject[] results = new ColoredObject[] { colors.get(invocation.getResult()) };
 
 				invocationCallback.onInvokation(invocation, args, results).forEach((node, newColor) -> {
-					PathToClassesAndColor prev = colors.get(node);
+					ColoredObject prev = colors.get(node);
 					if (prev == null || !prev.equals(newColor)) {
 						newColors.put(node, newColor);
 					}

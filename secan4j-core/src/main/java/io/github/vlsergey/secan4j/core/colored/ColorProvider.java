@@ -9,6 +9,6 @@ import lombok.NonNull;
 public interface ColorProvider {
 
 	@NonNull
-	Optional<PathToClassesAndColor> getImplicitColor(CtClass ctClass, CtBehavior ctMethod, int parameterIndex);
+	Optional<ColoredObject> getImplicitColor(CtClass ctClass, CtBehavior ctMethod, int parameterIndex);
 
 }
