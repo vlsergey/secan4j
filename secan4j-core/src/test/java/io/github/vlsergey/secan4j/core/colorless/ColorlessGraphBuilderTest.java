@@ -19,8 +19,7 @@ class ColorlessGraphBuilderTest {
 		final CtClass ctClass = classPool.get(SimpleMethods.class.getName());
 		final CtMethod ctMethod = ctClass.getDeclaredMethod("xOrNull");
 
-		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
-		System.out.println(graph);
+		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod).orElse(null);
 
 		assertEquals(1, graph.getMethodParamNodes().length);
 		assertEquals(Type.get(classPool.get(Object.class.getName())), graph.getMethodParamNodes()[0].type);

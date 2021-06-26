@@ -19,4 +19,14 @@ public class SetUtils {
 		return result;
 	}
 
+	public static <T> Set<T> join(Set<T> a, Set<T> b) {
+		if (a.size() < b.size()) {
+			return join(b, a);
+		}
+
+		final Set<T> result = new HashSet<>(a);
+		result.addAll(b);
+		return result;
+	}
+
 }

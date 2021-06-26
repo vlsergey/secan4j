@@ -1,9 +1,11 @@
 package io.github.vlsergey.secan4j.core.session;
 
-import io.github.vlsergey.secan4j.core.colored.PathAndColor;
+import io.github.vlsergey.secan4j.core.colored.PathToClassesAndColor;
+import javassist.CtBehavior;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode.Exclude;
+import lombok.NonNull;
 
 @AllArgsConstructor
 @Data
@@ -16,11 +18,9 @@ class PaintingTask implements Comparable<PaintingTask>, Runnable {
 
 	}
 
-	private final String className;
-	private final String methodName;
-	private final String methodSignature;
-	private final PathAndColor[] paintedIns;
-	private final PathAndColor[] paintedOuts;
+	private final @NonNull CtBehavior ctMethod;
+	private final PathToClassesAndColor[] paintedIns;
+	private final PathToClassesAndColor[] paintedOuts;
 
 	@Exclude
 	private final long priority;
@@ -42,7 +42,6 @@ class PaintingTask implements Comparable<PaintingTask>, Runnable {
 	}
 
 	public PaintingTask withPriorityAndVersionOfHeap(final long priority, final long versionOfHeap) {
-		return new PaintingTask(className, methodName, methodSignature, paintedIns, paintedOuts, priority,
-				taskToExecute, versionOfHeap);
+		return new PaintingTask(ctMethod, paintedIns, paintedOuts, priority, taskToExecute, versionOfHeap);
 	}
 }

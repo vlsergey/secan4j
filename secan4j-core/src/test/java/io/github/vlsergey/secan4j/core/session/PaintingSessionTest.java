@@ -22,7 +22,7 @@ class PaintingSessionTest {
 			fail("We din't expect intersection to be found so soon");
 		});
 
-		paintingSession.analyze(ctClass, ctMethod);
+		paintingSession.analyze(ctMethod);
 	}
 
 }

@@ -40,7 +40,7 @@ class BatchColorlessGraphBuilderTest {
 	@ParameterizedTest
 	@MethodSource("provideMethods")
 	void testBuildGraph(CtClass ctClass, CtMethod ctMethod) throws Exception {
-		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
+		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod).orElse(null);
 		assertNotNull((graph == null) == ctMethod.isEmpty());
 	}
 

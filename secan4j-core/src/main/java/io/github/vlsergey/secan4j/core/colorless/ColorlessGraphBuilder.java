@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -57,8 +58,14 @@ public class ColorlessGraphBuilder {
 	}
 
 	static final DataNode CONST_INT_0 = new DataNode("int 0").setType(Type.INTEGER);
-
 	static final DataNode CONST_INT_1 = new DataNode("int 1").setType(Type.INTEGER);
+	static final DataNode CONST_INT_2 = new DataNode("int 2").setType(Type.INTEGER);
+	static final DataNode CONST_INT_3 = new DataNode("int 3").setType(Type.INTEGER);
+	static final DataNode CONST_INT_4 = new DataNode("int 4").setType(Type.INTEGER);
+	static final DataNode CONST_INT_5 = new DataNode("int 5").setType(Type.INTEGER);
+
+	static final DataNode[] CONST_INTS = new DataNode[] { CONST_INT_0, CONST_INT_1, CONST_INT_2, CONST_INT_3,
+			CONST_INT_4, CONST_INT_5 };
 
 	static final DataNode CONST_LONG_0 = new DataNode("long 0").setType(Type.LONG);
 
@@ -161,12 +168,12 @@ public class ColorlessGraphBuilder {
 	}
 
 	@SneakyThrows
-	public BlockDataGraph buildGraph(final CtClass ctClass, final @NonNull CtBehavior ctMethod) {
-		ControlFlow controlFlow = new ControlFlow(ctMethod.getDeclaringClass(), ctMethod.getMethodInfo2());
+	public @NonNull Optional<BlockDataGraph> buildGraph(final CtClass ctClass, final @NonNull CtBehavior ctMethod) {
+		ControlFlow controlFlow = new ControlFlow(ctClass, ctMethod.getMethodInfo());
 
 		final Block[] basicBlocks = controlFlow.basicBlocks();
 		if (basicBlocks == null || basicBlocks.length == 0) {
-			return null;
+			return Optional.empty();
 		}
 
 		final Node rootNode = controlFlow.dominatorTree()[0];
@@ -177,6 +184,7 @@ public class ColorlessGraphBuilder {
 
 		List<DataNode> methodParams = new ArrayList<>();
 
+		// TODO: push down to analyzed class?
 		int counter = 0;
 		if (!Modifier.isStatic(ctMethod.getModifiers())) {
 			assertAssignableFrom(ctMethod.getDeclaringClass(), rootFrame.getLocal(counter));
@@ -210,9 +218,9 @@ public class ColorlessGraphBuilder {
 		final PutStaticNode[] putStaticNodes = collect(doneGraphs, BlockDataGraph::getPutStaticNodes,
 				PutStaticNode[]::new);
 
-		return new BlockDataGraph(allNodes, incLocalNodes, EMPTY_STACK, invokations,
+		return Optional.of(new BlockDataGraph(allNodes, incLocalNodes, EMPTY_STACK, invokations,
 				methodParams.toArray(DataNode[]::new), methodReturnNodes, DataNode.EMPTY_DATA_NODES, outputs,
-				EMPTY_STACK, putFieldNodes, putStaticNodes);
+				EMPTY_STACK, putFieldNodes, putStaticNodes));
 	}
 
 	@SneakyThrows
@@ -419,6 +427,10 @@ public class ColorlessGraphBuilder {
 			toReturn = currentStack.pop();
 			break;
 
+		case Opcode.ARRAYLENGTH:
+			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			break;
+
 		case Opcode.ASTORE:
 			currentLocals[iterator.byteAt(index + 1)] = currentStack.pop();
 			break;
@@ -434,6 +446,29 @@ public class ColorlessGraphBuilder {
 			final DataNode toThrow = currentStack.peek();
 			currentStack.clear();
 			currentStack.push(toThrow);
+			break;
+
+		case Opcode.BALOAD:
+		case Opcode.CALOAD:
+		case Opcode.DALOAD:
+		case Opcode.FALOAD:
+		case Opcode.IALOAD:
+		case Opcode.LALOAD:
+		case Opcode.SALOAD: {
+			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 2, typeOfNextStackTop);
+			break;
+		}
+
+		case Opcode.BASTORE:
+		case Opcode.CASTORE:
+		case Opcode.DASTORE:
+		case Opcode.FASTORE:
+		case Opcode.IASTORE:
+		case Opcode.LASTORE:
+		case Opcode.SASTORE:
+			currentStack.pop();
+			currentStack.pop();
+			currentStack.pop();
 			break;
 
 		case Opcode.BIPUSH:
@@ -510,6 +545,15 @@ public class ColorlessGraphBuilder {
 			// nothing is changed in data
 			break;
 
+		case Opcode.I2B:
+		case Opcode.I2C:
+		case Opcode.I2D:
+		case Opcode.I2F:
+		case Opcode.I2L:
+		case Opcode.I2S:
+			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			break;
+
 		case Opcode.IADD:
 		case Opcode.IAND:
 		case Opcode.IDIV:
@@ -525,10 +569,12 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.ICONST_0:
-			currentStack.push(CONST_INT_0);
-			break;
 		case Opcode.ICONST_1:
-			currentStack.push(CONST_INT_1);
+		case Opcode.ICONST_2:
+		case Opcode.ICONST_3:
+		case Opcode.ICONST_4:
+		case Opcode.ICONST_5:
+			currentStack.push(CONST_INTS[op - Opcode.ICONST_0]);
 			break;
 
 		case Opcode.IF_ACMPEQ:
@@ -572,9 +618,11 @@ public class ColorlessGraphBuilder {
 			currentStack.push(currentLocals[op - Opcode.ILOAD_0]);
 			break;
 
-		case Opcode.INSTANCEOF:
+		case Opcode.INEG:
+		case Opcode.INSTANCEOF: {
 			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
 			break;
+		}
 
 		case Opcode.INVOKEDYNAMIC:
 		case Opcode.INVOKEINTERFACE:
@@ -626,7 +674,8 @@ public class ColorlessGraphBuilder {
 				currentStack.push(result);
 			}
 
-			invokations.add(new Invocation(className, methodName, signature, inputsArray, result));
+			invokations.add(new Invocation(className, methodName, signature, inputsArray, result,
+					op == Opcode.INVOKESTATIC || op == Opcode.INVOKEDYNAMIC));
 			break;
 		}
 
@@ -750,6 +799,11 @@ public class ColorlessGraphBuilder {
 			}
 			break;
 		}
+
+		case Opcode.SIPUSH:
+			int constantValue = iterator.u16bitAt(index + 1);
+			currentStack.push(new DataNode("shoart as int " + constantValue).setOperation(op).setType(Type.INTEGER));
+			break;
 
 		case Opcode.RETURN:
 			// return void

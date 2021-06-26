@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 import javax.xml.namespace.QName;
@@ -101,9 +102,9 @@ public class ColorlessGraphExported {
 						continue;
 					}
 
-					final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
-					if (graph == null
-							|| (graph.getMethodReturnNodes().length == 0 && graph.getInvokations().length == 0))
+					final Optional<BlockDataGraph> opGraph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod);
+					if (opGraph.isEmpty() || (opGraph.get().getMethodReturnNodes().length == 0
+							&& opGraph.get().getInvokations().length == 0))
 						continue;
 
 					System.out.println();
@@ -113,7 +114,7 @@ public class ColorlessGraphExported {
 					System.out.println(ctMethod.getLongName());
 					System.out.println();
 					final ColorlessGraphExported exported = new ColorlessGraphExported();
-					exported.export(graph, XMLOutputFactory.newInstance().createXMLEventWriter(System.out));
+					exported.export(opGraph.get(), XMLOutputFactory.newInstance().createXMLEventWriter(System.out));
 					System.out.println();
 					System.out.println("    =====8<=====    ");
 					System.out.println();

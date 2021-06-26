@@ -11,4 +11,5 @@ public class Invocation {
 	private final String methodSignature;
 	private final DataNode[] parameters;
 	private final DataNode result;
+	private final boolean staticCall;
 }

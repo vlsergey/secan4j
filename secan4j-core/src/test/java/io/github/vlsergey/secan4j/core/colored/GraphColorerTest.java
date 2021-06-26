@@ -34,7 +34,7 @@ public class GraphColorerTest {
 
 		List<Invocation> checkedInvokations = new ArrayList<>();
 
-		graphColorer.color(ctClass, ctMethod, new PathAndColor[] { null, null, null }, new PathAndColor[] { null },
+		graphColorer.color(ctClass, ctMethod, new PathToClassesAndColor[] { null, null, null }, new PathToClassesAndColor[] { null },
 				(inv, a, b) -> {
 					checkedInvokations.add(inv);
 					return emptyMap();
@@ -56,7 +56,7 @@ public class GraphColorerTest {
 
 		List<Invocation> checkedInvokations = new ArrayList<>();
 
-		graphColorer.color(ctClass, ctMethod, new PathAndColor[] { null, null, null }, new PathAndColor[] { null },
+		graphColorer.color(ctClass, ctMethod, new PathToClassesAndColor[] { null, null, null }, new PathToClassesAndColor[] { null },
 				(inv, a, b) -> {
 					checkedInvokations.add(inv);
 					return emptyMap();

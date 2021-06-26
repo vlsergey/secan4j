@@ -11,7 +11,7 @@ import io.github.vlsergey.secan4j.annotations.Command;
 import io.github.vlsergey.secan4j.annotations.UserProvided;
 import io.github.vlsergey.secan4j.core.colored.ColorProvider;
 import io.github.vlsergey.secan4j.core.colored.Confidence;
-import io.github.vlsergey.secan4j.core.colored.PathAndColor;
+import io.github.vlsergey.secan4j.core.colored.PathToClassesAndColor;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.data.DataProvider;
 import io.github.vlsergey.secan4j.data.SecanData;
@@ -65,19 +65,20 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 
 	@Override
 	@SneakyThrows
-	public @NonNull Optional<PathAndColor> getImplicitColor(CtClass ctClass, CtBehavior ctMethod, int parameterIndex) {
-		for (Object ann : ctMethod.getParameterAnnotations()[parameterIndex]) {
+	public @NonNull Optional<PathToClassesAndColor> getImplicitColor(CtClass ctClass, CtBehavior ctMethod, int parameterIndex) {
+		final CtClass parameterType = ctMethod.getParameterTypes()[parameterIndex];
 
+		for (Object ann : ctMethod.getParameterAnnotations()[parameterIndex]) {
 			if (ann instanceof Command) {
 				final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 						"Annotation @Command on");
 
-				return Optional.of(PathAndColor.sinkOnRoot(src, Confidence.EXPLICITLY));
+				return Optional.of(PathToClassesAndColor.sinkOnRoot(src, parameterType, Confidence.EXPLICITLY));
 			} else if (ann instanceof UserProvided) {
 				final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 						"Annotation @UserProvided on");
 
-				return Optional.of(PathAndColor.sourceOnRoot(src, Confidence.EXPLICITLY));
+				return Optional.of(PathToClassesAndColor.sourceOnRoot(src, parameterType, Confidence.EXPLICITLY));
 			}
 
 			// check if this annotation is configured to be source or sink
@@ -88,26 +89,26 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 				if (forAnnotation.contains(Command.class)) {
 					final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 							"Annotation @" + annClass.getSimpleName() + " configured as @Command on");
-					return Optional.of(PathAndColor.sinkOnRoot(src, Confidence.CONFIGURATION));
+					return Optional.of(PathToClassesAndColor.sinkOnRoot(src, parameterType, Confidence.CONFIGURATION));
 				} else if (forAnnotation.contains(UserProvided.class)) {
 					final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 							"Annotation @" + annClass.getSimpleName() + " configured as @UserProvided on");
-					return Optional.of(PathAndColor.sourceOnRoot(src, Confidence.CONFIGURATION));
+					return Optional.of(PathToClassesAndColor.sourceOnRoot(src, parameterType, Confidence.CONFIGURATION));
 				}
 			}
 		}
 
 		final @NonNull SecanData secanData = dataProvider.getDataForClass(ctClass.getName());
 		final Set<Class<?>> data = secanData.getForMethodArguments(ctClass.getName(), ctMethod.getName(),
-				SignatureAttribute.toMethodSignature(ctMethod.getSignature()))[0];
+				SignatureAttribute.toMethodSignature(ctMethod.getSignature()))[parameterIndex];
 		if (!data.isEmpty()) {
 			final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 					"Configuration info for");
 
 			if (data.contains(Command.class)) {
-				return Optional.of(PathAndColor.sinkOnRoot(src, Confidence.CONFIGURATION));
+				return Optional.of(PathToClassesAndColor.sinkOnRoot(src, parameterType, Confidence.CONFIGURATION));
 			} else if (data.contains(UserProvided.class)) {
-				return Optional.of(PathAndColor.sourceOnRoot(src, Confidence.CONFIGURATION));
+				return Optional.of(PathToClassesAndColor.sourceOnRoot(src, parameterType, Confidence.CONFIGURATION));
 			}
 		}
 

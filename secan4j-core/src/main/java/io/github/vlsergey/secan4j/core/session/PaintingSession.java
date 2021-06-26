@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -19,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 
 import io.github.vlsergey.secan4j.core.colored.GraphColorer;
-import io.github.vlsergey.secan4j.core.colored.PathAndColor;
+import io.github.vlsergey.secan4j.core.colored.PathToClassesAndColor;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
@@ -28,7 +29,7 @@ import io.github.vlsergey.secan4j.data.DataProvider;
 import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
-import javassist.CtMethod;
+import javassist.NotFoundException;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.experimental.Delegate;
@@ -84,9 +85,8 @@ public class PaintingSession {
 	}
 
 	@SuppressWarnings("unchecked")
-	public void analyze(CtClass ctClass, CtMethod ctMethod) throws ExecutionException, InterruptedException {
-		PaintingTask paintingTask = new PaintingTask(ctClass.getName(), ctMethod.getName(), ctMethod.getSignature(),
-				null, null, 0, this::executeTask, 0);
+	public void analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
+		PaintingTask paintingTask = new PaintingTask(ctMethod, null, null, 0, this::executeTask, 0);
 
 		Optional<Future<?>> op = Optional.of(queueImpl(paintingTask));
 		while (op.isPresent()) {
@@ -103,29 +103,45 @@ public class PaintingSession {
 	}
 
 	protected @NonNull void executeTask(final @NonNull PaintingTask task) {
-		log.debug("(Re)coloring {}.{} ({})...", task.getClassName(), task.getMethodName(), task.getMethodSignature());
+		if (log.isDebugEnabled())
+			log.debug("(Re)coloring {}...", task.getCtMethod().getLongName());
+
 		try {
-			final @NonNull CtClass ctClass = classPool.get(task.getClassName());
-			final @NonNull CtBehavior ctMethod = "<init>".equals(task.getMethodName())
-					? ctClass.getConstructor(task.getMethodSignature())
-					: ctClass.getMethod(task.getMethodName(), task.getMethodSignature());
+			// XXX: push down to arg type?
+			final @NonNull CtClass ctClass = task.getCtMethod().getDeclaringClass();
 
 			final long usedHeapVersion = currentHeapVersion.get();
-			PathAndColor[][] updated = graphColorer.color(ctClass, ctMethod, task.getPaintedIns(),
+			Optional<PathToClassesAndColor[][]> opUpdated = graphColorer.color(ctClass, task.getCtMethod(), task.getPaintedIns(),
 					task.getPaintedOuts(), (subInvokation, ins, outs) -> {
-						log.debug("Going deeper from {}.{} by analyzing {}.{} call", task.getClassName(),
-								task.getMethodName(), subInvokation.getClassName(), subInvokation.getMethodName());
-						queue(subInvokation, ins, outs, task.getPriority() - 1, task);
-						return emptyMap();
+						if (task.getCtMethod().isEmpty()) {
+							// virtual, so far ignore
+							return emptyMap();
+						}
+
+						log.debug("Going deeper from {} by analyzing {}.{} call", task.getCtMethod().getName(),
+								subInvokation.getClassName(), subInvokation.getMethodName());
+						try {
+							queue(subInvokation, ins, outs, task.getPriority() - 1, task);
+							// XXX: actually return result
+							return emptyMap();
+						} catch (Exception exc) {
+							log.warn("Unable to go deeper: " + exc.getMessage(), exc);
+							return emptyMap();
+						}
 					}, onSourceSinkIntersection);
+			if (opUpdated.isEmpty()) {
+				log.warn("No results for deeper travel to {}", task.getCtMethod());
+				return;
+			}
+			final @NonNull PathToClassesAndColor[][] updated = opUpdated.get();
 
 			final PaintingTaskResult prevResults = results.get(task);
 			if (prevResults == null || !Arrays.equals(prevResults.getPaintedIns(), updated[0])
 					|| !Arrays.equals(prevResults.getPaintedOuts(), updated[1])
 					|| prevResults.getVersionOfHeap() < usedHeapVersion) {
-				log.debug(
-						"Colors were changed after recheking {}.{} ({}). Store new result and invoke update listeners",
-						task.getClassName(), task.getMethodName(), task.getMethodSignature());
+				if (log.isDebugEnabled())
+					log.debug("Colors were changed after recheking {}. Store new result and invoke update listeners",
+							task.getCtMethod().getLongName());
 
 				results.put(task, new PaintingTaskResult(updated[0], updated[1], usedHeapVersion));
 
@@ -138,29 +154,44 @@ public class PaintingSession {
 					}
 				}
 			} else {
-				log.debug("Colors didn't changed after recheking {}.{} ({}), drop update listeners",
-						task.getClassName(), task.getMethodName(), task.getMethodSignature());
+				if (log.isDebugEnabled())
+					log.debug("Colors didn't changed after recheking {}, drop update listeners",
+							task.getCtMethod().getLongName());
 				listeners.remove(task);
 			}
 
 		} catch (Exception exc) {
-			log.error("Unable to execute colorizing task for " + task.getClassName() + "." + task.getMethodName() + " ("
-					+ task.getMethodSignature() + "): " + exc.getMessage(), exc);
+			log.error("Unable to execute colorizing task for " + task.getCtMethod().getLongName() + ": "
+					+ exc.getMessage(), exc);
 			// no, we don't requeue after error
 		}
 	}
 
-	public void queue(Invocation invokation, PathAndColor[] paintedIns, PathAndColor[] paintedOuts, long priority,
-			PaintingTask toInvokeAfter) {
+	public void queue(Invocation invocation, PathToClassesAndColor[] paintedIns, PathToClassesAndColor[] paintedOuts, long priority,
+			PaintingTask toInvokeAfter) throws NotFoundException {
+
+		CtClass invClass = classPool.get(invocation.getClassName());
+		CtBehavior invMethod = invocation.getMethodName().equals("<init>")
+				? invClass.getConstructor(invocation.getMethodSignature())
+				: invClass.getMethod(invocation.getMethodName(), invocation.getMethodSignature());
 
 		synchronized (this) {
-			queueImpl(new PaintingTask(invokation.getClassName(), invokation.getMethodName(),
-					invokation.getMethodSignature(), paintedIns, paintedOuts, priority, this::executeTask,
+			queueImpl(new PaintingTask(invMethod, paintedIns, paintedOuts, priority, this::executeTask,
 					currentHeapVersion.get()));
 		}
 	}
 
 	private synchronized Future<?> queueImpl(final PaintingTask toQueue) {
+		final PaintingTaskResult alreadyCalculated = this.results.get(toQueue);
+		if (alreadyCalculated != null) {
+			if (alreadyCalculated.getVersionOfHeap() >= toQueue.getVersionOfHeap()) {
+				log.debug("We have results for {}() and they are fresh enought", toQueue.getCtMethod().getName());
+				return CompletableFuture.completedFuture(null);
+			}
+			log.debug("We have results for {}(), but they need to be updated with new version of heap ({} < {})",
+					toQueue.getCtMethod().getName(), alreadyCalculated.getVersionOfHeap(), toQueue.getVersionOfHeap());
+		}
+
 		final QueuedTask alreadyQueued = queued.get(toQueue);
 		if (alreadyQueued != null) {
 			PaintingTask existed = alreadyQueued.getTask();
