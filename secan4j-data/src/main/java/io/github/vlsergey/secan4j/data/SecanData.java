@@ -7,6 +7,7 @@ import static java.util.stream.Collectors.toSet;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -125,7 +126,7 @@ public class SecanData {
 				List<?> list = (List<?>) data.get("arguments");
 				// must be strings OR lists of strings
 				return list.stream()
-						.map(x -> SecanData
+						.map(x -> x == null ? null : SecanData
 								.toConfigNode(x, StringData::new, ListData::new, (any) -> EmptyConfigNode.INSTANCE,
 										() -> new UnsupportedOperationException(
 												"Unsupported configuration format for result of method override "

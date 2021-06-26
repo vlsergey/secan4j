@@ -1,0 +1,6 @@
+System:
+  arraycopy:
+    arguments:
+    - CopyColorsFrom
+    - 
+    - CopyColorsTo
