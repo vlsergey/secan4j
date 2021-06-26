@@ -1,47 +1,106 @@
 package io.github.vlsergey.secan4j.core.session;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
+
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
+import javassist.ClassPool;
 import javassist.CtBehavior;
+import javassist.CtClass;
+import javassist.CtConstructor;
+import javassist.CtMethod;
+import javassist.NotFoundException;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.EqualsAndHashCode.Exclude;
+import lombok.Getter;
 import lombok.NonNull;
+import lombok.Setter;
+import lombok.experimental.Delegate;
 
-@AllArgsConstructor
-@Data
-class PaintingTask implements Comparable<PaintingTask>, Runnable {
+public class PaintingTask {
 
-	@FunctionalInterface
-	public interface TaskExecution {
-
-		void run(PaintingTask task);
-
+	@AllArgsConstructor
+	@Data
+	public static class Result {
+		private final ColoredObject[] resultIns;
+		private final ColoredObject[] resultOuts;
+		private final long versionOfHeap;
 	}
 
-	private final @NonNull CtBehavior ctMethod;
-	private final ColoredObject[] paintedIns;
-	private final ColoredObject[] paintedOuts;
+	@AllArgsConstructor(access = AccessLevel.PRIVATE)
+	@Data
+	public static class TaskKey {
+		private final @NonNull String className;
+		private final @NonNull String methodName;
+		private final @NonNull String methodSignature;
 
-	@Exclude
-	private final long priority;
+		private final ColoredObject[] paramIns;
+		private final ColoredObject[] paramOuts;
 
-	@Exclude
-	private final TaskExecution taskToExecute;
+		public TaskKey(CtBehavior ctMethod) {
+			this(ctMethod.getDeclaringClass().getName().intern(),
+					ctMethod instanceof CtConstructor ? "<init>" : ((CtMethod) ctMethod).getName().intern(),
+					ctMethod.getSignature().intern(), null, null);
+		}
 
-	@Exclude
-	private final long versionOfHeap;
+		@Override
+		public TaskKey clone() {
+			return new TaskKey(className, methodName, methodSignature, paramIns, paramOuts);
+		}
 
-	@Override
-	public int compareTo(PaintingTask o) {
-		return Long.compare(this.priority, o.priority);
+		public @NonNull CtBehavior getMethod(final @NonNull ClassPool classPool) throws NotFoundException {
+			CtClass ctClass = classPool.get(className);
+			return "<init>".equals(methodName) ? ctClass.getConstructor(methodSignature)
+					: ctClass.getMethod(methodName, methodSignature);
+		}
 	}
 
-	@Override
-	public void run() {
-		this.taskToExecute.run(this);
+	@Delegate
+	private final @NonNull TaskKey arguments;
+
+	private @NonNull Set<PaintingTask> dependants = emptySet();
+
+	@Getter
+	@Setter
+	private @NonNull Set<PaintingTask> dependencies = emptySet();
+
+	@Delegate
+	@Getter
+	@Setter
+	private Result result;
+
+	public PaintingTask(final @NonNull CtBehavior ctMethod) {
+		this.arguments = new PaintingTask.TaskKey(ctMethod);
 	}
 
-	public PaintingTask withPriorityAndVersionOfHeap(final long priority, final long versionOfHeap) {
-		return new PaintingTask(ctMethod, paintedIns, paintedOuts, priority, taskToExecute, versionOfHeap);
+	public PaintingTask(final @NonNull PaintingTask.TaskKey key) {
+		this.arguments = key;
 	}
+
+	public synchronized void addDependant(PaintingTask node) {
+		if (this.dependants == Collections.<PaintingTask>emptySet()) {
+			this.dependants = newSetFromMap(new WeakHashMap<>());
+		}
+		this.dependants.add(node);
+	}
+
+	public synchronized Collection<PaintingTask> getDependants() {
+		if (this.dependants.isEmpty()) {
+			return emptySet();
+		}
+
+		return new ArrayList<PaintingTask>(this.dependants);
+	}
+
+	public synchronized void removeDependant(@NonNull PaintingTask task) {
+		this.dependants.remove(task);
+	}
+
 }

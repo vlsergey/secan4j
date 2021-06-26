@@ -234,8 +234,7 @@ public class ColorlessGraphExported {
 				writeEdge(nodeToId.get(param), id, writer);
 			}
 
-			final DataNode resultNode = invokation.getResult();
-			if (resultNode != null) {
+			for (DataNode resultNode : invokation.getResults()) {
 				dumpWithIncomings(nodeToId, resultNode, writer);
 				writeEdge(id, nodeToId.get(resultNode), writer);
 			}

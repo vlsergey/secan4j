@@ -10,6 +10,6 @@ public class Invocation {
 	private final String methodName;
 	private final String methodSignature;
 	private final DataNode[] parameters;
-	private final DataNode result;
+	private final DataNode[] results;
 	private final boolean staticCall;
 }

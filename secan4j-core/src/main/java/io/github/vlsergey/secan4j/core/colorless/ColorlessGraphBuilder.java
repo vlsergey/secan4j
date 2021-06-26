@@ -673,7 +673,8 @@ public class ColorlessGraphBuilder {
 				currentStack.push(result);
 			}
 
-			invokations.add(new Invocation(className, methodName, signature, inputsArray, result,
+			invokations.add(new Invocation(className, methodName, signature, inputsArray,
+					result == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { result },
 					op == Opcode.INVOKESTATIC || op == Opcode.INVOKEDYNAMIC));
 			break;
 		}

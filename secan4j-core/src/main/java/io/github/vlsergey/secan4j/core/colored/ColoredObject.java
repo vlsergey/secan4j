@@ -3,6 +3,7 @@ package io.github.vlsergey.secan4j.core.colored;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -26,8 +27,33 @@ public class ColoredObject {
 
 	private static final PaintedColor MIX_OF_COLORS = new PaintedColor(null, null, ColorType.Intersection);
 
-	static ColoredObject forRootOnly(final @NonNull CtClass ctClass, PaintedColor color) {
-		return new ColoredObject(color, emptyMap(), null, singleton(ctClass));
+	private static void demultiplex(final @NonNull ColoredObject[] src, final @NonNull ColoredObject[] buffer,
+			int pointer, final @NonNull Consumer<@NonNull ColoredObject[]> consumer) {
+		if (pointer == src.length) {
+			final @NonNull ColoredObject[] bufferCopy = Arrays.copyOf(buffer, buffer.length);
+			consumer.accept(bufferCopy);
+			return;
+		}
+
+		final ColoredObject co = src[pointer];
+		if (co == null) {
+			demultiplex(src, buffer, pointer + 1, consumer);
+			return;
+		}
+
+		co.demultiplex(d -> {
+			buffer[pointer] = d;
+			demultiplex(src, buffer, pointer + 1, consumer);
+		});
+	}
+
+	public static void demultiplex(final @NonNull ColoredObject[] src,
+			final @NonNull Consumer<@NonNull ColoredObject[]> consumer) {
+		demultiplex(src, Arrays.copyOf(src, src.length), 0, consumer);
+	}
+
+	static ColoredObject forRootOnly(final @NonNull CtClass cls, PaintedColor color) {
+		return new ColoredObject(color, emptyMap(), null, singleton(cls.getName().intern()));
 	}
 
 	public static @NonNull ColoredObject merge(final @Nullable ColoredObject picA, final @Nullable ColoredObject picB,
@@ -59,9 +85,9 @@ public class ColoredObject {
 		final @Nullable ColoredObject mergedItemOfArrayNode = mergeImpl(picA.itemOfArrayNode, picB.itemOfArrayNode,
 				colorMerged);
 
-		final @NonNull Set<CtClass> mergedSeendClassesHere = SetUtils.join(picA.seenClassesHere, picB.seenClassesHere);
+		final @NonNull Set<String> mergedSeendClassesHere = SetUtils.join(picA.seenClassesHere, picB.seenClassesHere);
 
-		final @NonNull Map<CtClass, Map<String, ColoredObject>> mergedFieldNodes = mergeMaps(picA.fieldNodes,
+		final @NonNull Map<String, Map<String, ColoredObject>> mergedFieldNodes = mergeMaps(picA.fieldNodes,
 				picB.fieldNodes, (fieldNodesA, fieldNodesB) -> mergeMaps(fieldNodesA, fieldNodesB,
 						(fieldColorA, fieldColorB) -> mergeImpl(fieldColorA, fieldColorB, colorMerged)));
 
@@ -111,12 +137,12 @@ public class ColoredObject {
 
 	private final @NonNull PaintedColor color;
 
-	private final @NonNull Map<CtClass, Map<String, ColoredObject>> fieldNodes;
+	private final @NonNull Map<String, Map<String, ColoredObject>> fieldNodes;
 
 	private final @Nullable ColoredObject itemOfArrayNode;
 
 	@With
-	private final @NonNull Set<CtClass> seenClassesHere;
+	private final @NonNull Set<String> seenClassesHere;
 
 	/**
 	 * Calls back multiple times -- one per each seen class (with value "limited" to

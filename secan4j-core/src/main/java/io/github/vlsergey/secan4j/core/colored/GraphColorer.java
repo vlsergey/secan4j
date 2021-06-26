@@ -129,8 +129,9 @@ public class GraphColorer {
 	}
 
 	@SneakyThrows
-	public @NonNull Optional<ColoredObject[][]> color(final @NonNull CtClass ctClass, final @NonNull CtBehavior ctMethod,
-			final ColoredObject[] ins, final ColoredObject[] outs, final @NonNull InvocationCallback invocationCallback,
+	public @NonNull Optional<ColoredObject[][]> color(final @NonNull CtClass ctClass,
+			final @NonNull CtBehavior ctMethod, final ColoredObject[] ins, final ColoredObject[] outs,
+			final @NonNull InvocationCallback invocationCallback,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 
 		final @NonNull Optional<InitialColoredMethodGraph> opInitial = buildInitialColoredMethodGraph(ctClass,
@@ -195,7 +196,8 @@ public class GraphColorer {
 			for (Invocation invocation : colorlessGraph.getInvokations()) {
 				final @NonNull ColoredObject[] args = Arrays.stream(invocation.getParameters()).map(colors::get)
 						.toArray(ColoredObject[]::new);
-				final @NonNull ColoredObject[] results = new ColoredObject[] { colors.get(invocation.getResult()) };
+				final @NonNull ColoredObject[] results = Arrays.stream(invocation.getResults()).map(colors::get)
+						.toArray(ColoredObject[]::new);
 
 				invocationCallback.onInvokation(invocation, args, results).forEach((node, newColor) -> {
 					ColoredObject prev = colors.get(node);
