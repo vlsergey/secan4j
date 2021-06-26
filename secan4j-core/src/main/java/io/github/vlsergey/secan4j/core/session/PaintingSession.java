@@ -155,11 +155,21 @@ public class PaintingSession {
 					invocation.getClassName(), invocation.getMethodName());
 
 			CtClass invClass = classPool.get(invocation.getClassName());
+
+			if (!invocation.isStaticCall() && ins[0] != null && ins[0].getSeenClassesHere().size() == 1) {
+				final String refinedClassName = ins[0].getSeenClassesHere().iterator().next();
+				if (!refinedClassName.equals(invocation.getClassName())) {
+					log.debug("Refine 'this' class from {} to {}", invocation.getClassName(), refinedClassName);
+					invClass = classPool.get(refinedClassName);
+				}
+			}
+
 			CtBehavior invMethod = invocation.getMethodName().equals("<init>")
 					? invClass.getConstructor(invocation.getMethodSignature())
 					: invClass.getMethod(invocation.getMethodName(), invocation.getMethodSignature());
 
 			if (invMethod.isEmpty()) {
+				log.debug("Skip method {}(…) analysis (empty method)", invocation.getMethodName());
 				return emptyMap();
 			}
 
