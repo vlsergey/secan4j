@@ -9,6 +9,8 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
+import javax.annotation.Nullable;
+
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import javassist.ClassPool;
 import javassist.CtBehavior;
@@ -44,10 +46,11 @@ public class PaintingTask {
 		private final ColoredObject[] paramIns;
 		private final ColoredObject[] paramOuts;
 
-		public TaskKey(CtBehavior ctMethod) {
+		public TaskKey(final @NonNull CtBehavior ctMethod, final @Nullable ColoredObject[] paramIns,
+				final @Nullable ColoredObject[] paramOuts) {
 			this(ctMethod.getDeclaringClass().getName().intern(),
 					ctMethod instanceof CtConstructor ? "<init>" : ((CtMethod) ctMethod).getName().intern(),
-					ctMethod.getSignature().intern(), null, null);
+					ctMethod.getSignature().intern(), paramIns, paramOuts);
 		}
 
 		@Override
@@ -76,8 +79,9 @@ public class PaintingTask {
 	@Setter
 	private Result result;
 
-	public PaintingTask(final @NonNull CtBehavior ctMethod) {
-		this.arguments = new PaintingTask.TaskKey(ctMethod);
+	public PaintingTask(final @NonNull CtBehavior ctMethod, final @Nullable ColoredObject[] paramIns,
+			final @Nullable ColoredObject[] paramOuts) {
+		this.arguments = new PaintingTask.TaskKey(ctMethod, paramIns, paramOuts);
 	}
 
 	public PaintingTask(final @NonNull PaintingTask.TaskKey key) {

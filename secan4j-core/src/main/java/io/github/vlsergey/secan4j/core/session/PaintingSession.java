@@ -68,7 +68,7 @@ public class PaintingSession {
 	}
 
 	public void analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
-		PaintingTask paintingTask = new PaintingTask(ctMethod);
+		PaintingTask paintingTask = new PaintingTask(ctMethod, null, null);
 		queueImpl(paintingTask);
 
 		this.executorService.waitForAllTasksToComplete();
@@ -80,7 +80,7 @@ public class PaintingSession {
 			final @NonNull CtBehavior method = task.getMethod(classPool);
 
 			if (log.isDebugEnabled())
-				log.debug("(Re)coloring {}...", method.getLongName());
+				log.debug("(Re)coloring {} with args {}", method.getLongName(), task.getParamIns());
 
 			// XXX: push down to arg type?
 			final @NonNull CtClass ctClass = method.getDeclaringClass();
@@ -121,7 +121,8 @@ public class PaintingSession {
 					|| !Arrays.equals(prevResults.getResultOuts(), updated[1])
 					|| prevResults.getVersionOfHeap() < usedHeapVersion) {
 				if (log.isDebugEnabled())
-					log.debug("Colors were changed after recheking {}. Store new result…", method.getLongName());
+					log.debug("Colors were changed after recheking {}. Store new result: {} / {}", method.getLongName(),
+							updated[0], updated[1]);
 
 				task.setResult(new Result(updated[0], updated[1], usedHeapVersion));
 
@@ -150,9 +151,8 @@ public class PaintingSession {
 		assert outs.length == invocation.getResults().length;
 
 		try {
-			log.debug("Going deeper from {}(…) by analyzing {}.{}(…) call",
-					prevTask.getMethod(this.classPool).getName(), invocation.getClassName(),
-					invocation.getMethodName());
+			log.debug("Going deeper from {}(…) by analyzing {}.{}(…) call", prevTask.getMethodName(),
+					invocation.getClassName(), invocation.getMethodName());
 
 			CtClass invClass = classPool.get(invocation.getClassName());
 			CtBehavior invMethod = invocation.getMethodName().equals("<init>")
@@ -168,8 +168,8 @@ public class PaintingSession {
 
 			ColoredObject.demultiplex(ins, (singleClassIns) -> {
 
-				final PaintingTask subCallTask = allNodes.computeIfAbsent(new PaintingTask.TaskKey(invMethod),
-						PaintingTask::new);
+				final PaintingTask subCallTask = allNodes
+						.computeIfAbsent(new PaintingTask.TaskKey(invMethod, singleClassIns, outs), PaintingTask::new);
 				newDependencies.add(subCallTask);
 
 				final Result cached = subCallTask.getResult();
