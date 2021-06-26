@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -19,6 +20,7 @@ import io.github.vlsergey.secan4j.annotations.CopyColorsTo;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
+import io.github.vlsergey.secan4j.core.colorless.GetFieldNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
 import io.github.vlsergey.secan4j.core.colorless.MethodParameterNode;
 import io.github.vlsergey.secan4j.data.DataProvider;
@@ -205,6 +207,17 @@ public class GraphColorer {
 			// TODO: optimize by checking only changed nodes
 			final Map<DataNode, ColoredObject> newColors = new HashMap<>();
 
+			for (DataNode dataNode : colorlessGraph.getAllNodes()) {
+				if (dataNode instanceof GetFieldNode) {
+					GetFieldNode getField = ((GetFieldNode) dataNode);
+
+					// TODO: replace with InheritFromOwner annotation
+					copyColor(colors, getField.getObjectRef(),
+							color -> ColoredObject.forRootOnly(dataNode.getType().getCtClass(), color.getColor()),
+							getField, newColors);
+				}
+			}
+
 			for (Invocation invocation : colorlessGraph.getInvokations()) {
 				final @NonNull ColoredObject[] args = Arrays.stream(invocation.getParameters()).map(colors::get)
 						.toArray(ColoredObject[]::new);
@@ -252,25 +265,30 @@ public class GraphColorer {
 					assert sources.size() == 1 : "sources.size() != 1 (NYI)";
 					assert targets.size() == 1 : "targets.size() != 1 (NYI)";
 
-					DataNode source = sources.get(0);
-					DataNode target = targets.get(0);
-
-					final ColoredObject sourceColor = colors.get(source);
-					if (sourceColor != null) {
-						final ColoredObject oldTargetColor = colors.get(target);
-						final ColoredObject newTargetColor = ColoredObject.merge(oldTargetColor, sourceColor, null);
-						if (!newTargetColor.equals(oldTargetColor)) {
-							newColors.put(target, newTargetColor);
-							log.debug("Color {} copied from {} to {} as {}", sourceColor, source, target,
-									newTargetColor);
-						}
-					}
+					copyColor(colors, sources.get(0), Function.identity(), targets.get(0), newColors);
 				}
 
 			}
 
 			hasChanges = !newColors.isEmpty();
 			colors.putAll(newColors);
+		}
+	}
+
+	private static void copyColor(final @NonNull Map<DataNode, ColoredObject> oldColors, final @NonNull DataNode source,
+			final @NonNull Function<ColoredObject, ColoredObject> colorTransformation, final @NonNull DataNode target,
+			final @NonNull Map<DataNode, ColoredObject> newColors) {
+		final ColoredObject sourceColor = oldColors.get(source);
+		if (sourceColor == null) {
+			return;
+		}
+		final ColoredObject transformed = colorTransformation.apply(sourceColor);
+
+		final ColoredObject oldTargetColor = oldColors.get(target);
+		final ColoredObject newTargetColor = ColoredObject.merge(oldTargetColor, transformed, null);
+		if (!newTargetColor.equals(oldTargetColor)) {
+			newColors.put(target, newTargetColor);
+			log.debug("Color {} copied from {} to {} as {}", sourceColor, source, target, newTargetColor);
 		}
 	}
 
