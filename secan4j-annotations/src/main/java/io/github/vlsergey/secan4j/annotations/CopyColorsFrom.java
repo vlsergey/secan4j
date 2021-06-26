@@ -10,7 +10,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Marks parameters for database processing (SQL), shell command line text, etc.
+ * Mark target to copy color from
  */
 @Inherited
 @Retention(RUNTIME)

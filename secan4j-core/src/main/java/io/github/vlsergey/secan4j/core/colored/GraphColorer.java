@@ -2,24 +2,31 @@ package io.github.vlsergey.secan4j.core.colored;
 
 import static java.util.Collections.unmodifiableMap;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
+import io.github.vlsergey.secan4j.annotations.CopyColorsFrom;
+import io.github.vlsergey.secan4j.annotations.CopyColorsTo;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
 import io.github.vlsergey.secan4j.core.colorless.MethodParameterNode;
+import io.github.vlsergey.secan4j.data.DataProvider;
 import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
 import javassist.NotFoundException;
+import javassist.bytecode.SignatureAttribute;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
@@ -35,6 +42,8 @@ public class GraphColorer {
 	private final @NonNull ColorlessGraphBuilder colorlessGraphBuilder;
 
 	private final @NonNull ColorProvider colorProvider;
+
+	private final @NonNull DataProvider dataProvider;
 
 	private final @NonNull Cache<Invocation, CtClass> invClassCache = CacheBuilder.newBuilder().maximumSize(1 << 10)
 			.build();
@@ -53,6 +62,7 @@ public class GraphColorer {
 		private final DataNode[] methodReturns;
 	}
 
+	@SneakyThrows
 	private @NonNull Optional<InitialColoredMethodGraph> buildInitialColoredMethodGraph(final @NonNull CtClass ctClass,
 			final @NonNull CtBehavior ctMethod) {
 		final @NonNull Optional<BlockDataGraph> opColorlessGraph = colorlessGraphBuilder.buildGraph(ctClass, ctMethod);
@@ -76,8 +86,8 @@ public class GraphColorer {
 			}
 		}
 
-		for (final @NonNull Invocation invokation : colorlessGraph.getInvokations()) {
-			final String className = invokation.getClassName();
+		for (final @NonNull Invocation invocation : colorlessGraph.getInvokations()) {
+			final String className = invocation.getClassName();
 			if (className == null)
 				continue;
 
@@ -88,18 +98,18 @@ public class GraphColorer {
 				log.warn("Invokation class not found: " + className);
 				continue;
 			}
-			invClassCache.put(invokation, invTargetClass);
+			invClassCache.put(invocation, invTargetClass);
 
 			// TODO: down to child classes if only one present
 
 			final CtBehavior invTargetMethod;
 			try {
-				invTargetMethod = invokation.getMethodName().equals("<init>")
-						? invTargetClass.getConstructor(invokation.getMethodSignature())
-						: invTargetClass.getMethod(invokation.getMethodName(), invokation.getMethodSignature());
+				invTargetMethod = invocation.getMethodName().equals("<init>")
+						? invTargetClass.getConstructor(invocation.getMethodSignature())
+						: invTargetClass.getMethod(invocation.getMethodName(), invocation.getMethodSignature());
 
 				for (int i = 0; i < invTargetMethod.getParameterTypes().length; i++) {
-					final DataNode dataNode = invokation.getParameters()[i];
+					final DataNode dataNode = invocation.getParameters()[i];
 					final @NonNull Optional<ColoredObject> opColor = colorProvider.getImplicitColor(invTargetClass,
 							invTargetMethod, i);
 					opColor.ifPresent(color -> {
@@ -111,18 +121,19 @@ public class GraphColorer {
 				}
 
 			} catch (NotFoundException exc) {
-				log.warn("Invokation method not found: " + className + "." + invokation.getMethodName() + ": '"
-						+ invokation.getMethodSignature() + "'", exc);
+				log.warn("Invokation method not found: " + className + "." + invocation.getMethodName() + ": '"
+						+ invocation.getMethodSignature() + "'", exc);
 				continue;
 			}
-			invMethodsCache.put(invokation, invTargetMethod);
+			invMethodsCache.put(invocation, invTargetMethod);
+
 		}
 
 		return Optional.of(new InitialColoredMethodGraph(colorlessGraph, unmodifiableMap(colors),
 				colorlessGraph.getMethodParamNodes(), colorlessGraph.getMethodReturnNodes()));
 	}
 
-	public interface InvocationCallback {
+	public interface invocationCallback {
 		@NonNull
 		Map<DataNode, ColoredObject> onInvokation(final @NonNull Invocation invocation,
 				final @NonNull ColoredObject[] ins, final @NonNull ColoredObject[] outs);
@@ -131,7 +142,7 @@ public class GraphColorer {
 	@SneakyThrows
 	public @NonNull Optional<ColoredObject[][]> color(final @NonNull CtClass ctClass,
 			final @NonNull CtBehavior ctMethod, final ColoredObject[] ins, final ColoredObject[] outs,
-			final @NonNull InvocationCallback invocationCallback,
+			final @NonNull invocationCallback invocationCallback,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 
 		final @NonNull Optional<InitialColoredMethodGraph> opInitial = buildInitialColoredMethodGraph(ctClass,
@@ -184,8 +195,9 @@ public class GraphColorer {
 		}
 	}
 
+	@SneakyThrows
 	private void colorImpl(final @NonNull BlockDataGraph colorlessGraph,
-			final @NonNull Map<DataNode, ColoredObject> colors, final @NonNull InvocationCallback invocationCallback,
+			final @NonNull Map<DataNode, ColoredObject> colors, final @NonNull invocationCallback invocationCallback,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 		// initial colors are assigned, now time to color nodes...
 		boolean hasChanges = true;
@@ -205,6 +217,56 @@ public class GraphColorer {
 						newColors.put(node, newColor);
 					}
 				});
+
+				final Set<Class<?>> forMethodResult = dataProvider.getDataForClass(invocation.getClassName())
+						.getForMethodResult(invocation.getClassName(), invocation.getMethodName(),
+								SignatureAttribute.toMethodSignature(invocation.getMethodSignature()));
+				final Set<Class<?>>[] forMethodArguments = dataProvider.getDataForClass(invocation.getClassName())
+						.getForMethodArguments(invocation.getClassName(), invocation.getMethodName(),
+								SignatureAttribute.toMethodSignature(invocation.getMethodSignature()));
+
+				if (forMethodResult.contains(CopyColorsTo.class) || Arrays.stream(forMethodArguments)
+						.anyMatch(s -> s != null && s.contains(CopyColorsTo.class))) {
+					// yes, we have copy-colors annotation
+					List<DataNode> sources = new ArrayList<>(1);
+					List<DataNode> targets = new ArrayList<>(1);
+					if (forMethodResult.contains(CopyColorsFrom.class)) {
+						sources.addAll(Arrays.asList(invocation.getResults()));
+					}
+					if (forMethodResult.contains(CopyColorsTo.class)) {
+						targets.addAll(Arrays.asList(invocation.getResults()));
+					}
+					for (int i = 0; i < Math.min(invocation.getParameters().length, forMethodArguments.length); i++) {
+						final Set<Class<?>> forArg = forMethodArguments[i];
+						if (forArg == null || forArg.isEmpty()) {
+							continue;
+						}
+						if (forArg.contains(CopyColorsFrom.class)) {
+							sources.add(invocation.getParameters()[i]);
+						}
+						if (forArg.contains(CopyColorsTo.class)) {
+							targets.add(invocation.getParameters()[i]);
+						}
+					}
+
+					assert sources.size() == 1 : "sources.size() != 1 (NYI)";
+					assert targets.size() == 1 : "targets.size() != 1 (NYI)";
+
+					DataNode source = sources.get(0);
+					DataNode target = targets.get(0);
+
+					final ColoredObject sourceColor = colors.get(source);
+					if (sourceColor != null) {
+						final ColoredObject oldTargetColor = colors.get(target);
+						final ColoredObject newTargetColor = ColoredObject.merge(oldTargetColor, sourceColor, null);
+						if (!newTargetColor.equals(oldTargetColor)) {
+							newColors.put(target, newTargetColor);
+							log.debug("Color {} copied from {} to {} as {}", sourceColor, source, target,
+									newTargetColor);
+						}
+					}
+				}
+
 			}
 
 			hasChanges = !newColors.isEmpty();

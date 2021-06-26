@@ -50,6 +50,8 @@ public class PaintingSession {
 
 	private final @NonNull AtomicLong currentHeapVersion = new AtomicLong(0);
 
+	private final @NonNull DataProvider dataProvider;
+
 	private final PaintingExecutorService<PaintingTask, PaintingTask> executorService;
 
 	private final @NonNull GraphColorer graphColorer;
@@ -63,8 +65,10 @@ public class PaintingSession {
 		this.executorService = new PaintingExecutorService<>(Functions.identity(), this::executeTask);
 
 		this.classPool = classPool;
+		this.dataProvider = new DataProvider();
+
 		this.graphColorer = new GraphColorer(classPool, new ColorlessGraphBuilder(),
-				new UserToCommandInjectionColorer(new DataProvider()));
+				new UserToCommandInjectionColorer(dataProvider), dataProvider);
 	}
 
 	public void analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {

@@ -23,36 +23,13 @@ public class GraphColorerTest {
 	private final ClassPool classPool = ClassPool.getDefault();
 	private final ColorlessGraphBuilder colorlessGraphBuilder = new ColorlessGraphBuilder();
 	private final DataProvider dataProvider = new DataProvider();
-
-	@Test
-	void testConcatenation() throws Exception {
-		final CtClass ctClass = classPool.get(SimpleColoredMethods.class.getName());
-		final CtMethod ctMethod = ctClass.getDeclaredMethod("concatenation");
-
-		GraphColorer graphColorer = new GraphColorer(classPool, colorlessGraphBuilder,
-				new UserToCommandInjectionColorer(dataProvider));
-
-		List<Invocation> checkedInvokations = new ArrayList<>();
-
-		graphColorer.color(ctClass, ctMethod, new ColoredObject[] { null, null, null }, new ColoredObject[] { null },
-				(inv, a, b) -> {
-					checkedInvokations.add(inv);
-					return emptyMap();
-				}, (source, sink) -> {
-					fail("We din't expect intersection to be found so soon");
-				});
-
-		// different in different JDKs
-		assertTrue(checkedInvokations.size() >= 1, "Invokations count: " + checkedInvokations.size());
-	}
+	private final GraphColorer graphColorer = new GraphColorer(classPool, colorlessGraphBuilder,
+			new UserToCommandInjectionColorer(dataProvider), dataProvider);
 
 	@Test
 	void testBadControllerExample() throws Exception {
 		final CtClass ctClass = classPool.get(BadControllerExample.class.getName());
 		final CtMethod ctMethod = ctClass.getDeclaredMethod("sqlInjection");
-
-		GraphColorer graphColorer = new GraphColorer(classPool, colorlessGraphBuilder,
-				new UserToCommandInjectionColorer(dataProvider));
 
 		List<Invocation> checkedInvokations = new ArrayList<>();
 
@@ -66,6 +43,25 @@ public class GraphColorerTest {
 
 		// different in different JDKs
 		assertTrue(checkedInvokations.size() >= 8, "Invokations count: " + checkedInvokations.size());
+	}
+
+	@Test
+	void testConcatenation() throws Exception {
+		final CtClass ctClass = classPool.get(SimpleColoredMethods.class.getName());
+		final CtMethod ctMethod = ctClass.getDeclaredMethod("concatenation");
+
+		List<Invocation> checkedInvokations = new ArrayList<>();
+
+		graphColorer.color(ctClass, ctMethod, new ColoredObject[] { null, null, null }, new ColoredObject[] { null },
+				(inv, a, b) -> {
+					checkedInvokations.add(inv);
+					return emptyMap();
+				}, (source, sink) -> {
+					fail("We din't expect intersection to be found so soon");
+				});
+
+		// different in different JDKs
+		assertTrue(checkedInvokations.size() >= 1, "Invokations count: " + checkedInvokations.size());
 	}
 
 }

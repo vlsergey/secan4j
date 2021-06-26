@@ -99,9 +99,11 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 		}
 
 		final @NonNull SecanData secanData = dataProvider.getDataForClass(ctClass.getName());
-		final Set<Class<?>> data = secanData.getForMethodArguments(ctClass.getName(), ctMethod.getName(),
-				SignatureAttribute.toMethodSignature(ctMethod.getSignature()))[parameterIndex];
-		if (!data.isEmpty()) {
+		final Set<Class<?>>[] forAllMethodArguments = secanData.getForMethodArguments(ctClass.getName(),
+				ctMethod.getName(), SignatureAttribute.toMethodSignature(ctMethod.getSignature()));
+		if (forAllMethodArguments != null && forAllMethodArguments.length > parameterIndex
+				&& forAllMethodArguments[parameterIndex] != null && !forAllMethodArguments[parameterIndex].isEmpty()) {
+			final Set<Class<?>> data = forAllMethodArguments[parameterIndex];
 			final TraceItem src = new MethodParameterTraceItem(ctClass, ctMethod, parameterIndex,
 					"Configuration info for");
 
