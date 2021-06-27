@@ -132,17 +132,17 @@ public class PaintingSession {
 					|| !Arrays.equals(prevResults.getResultOuts(), updated[1])
 					|| prevResults.getVersionOfHeap() < usedHeapVersion) {
 				if (log.isDebugEnabled())
-					log.debug("Colors were changed after recheking {}. Store new result: {} / {}", method.getLongName(),
-							updated[0], updated[1]);
+					log.debug("Colors were changed after recheking {}. Store new result: {} / {}â€¦",
+							method.getLongName(), updated[0], updated[1]);
 
 				task.setResult(new Result(updated[0], updated[1], usedHeapVersion));
 
 				// update only if not all null
 				if (hasNonNull(updated[0]) || hasNonNull(updated[1])) {
-					log.debug("…and invoke update listeners: {}", task.getDependants());
+					log.debug("â€¦and invoke update listeners: {}", task.getDependants());
 					task.getDependants().forEach(d -> this.queueImpl(d, QueueReason.DEPENDENCY_UPDATE));
 				} else {
-					log.debug("…but skip listeners, because result is empty (colorless)");
+					log.debug("â€¦but skip listeners, because result is empty (colorless)");
 				}
 			} else {
 				if (log.isDebugEnabled())
@@ -163,7 +163,7 @@ public class PaintingSession {
 
 		try {
 			if (log.isDebugEnabled()) {
-				log.debug("Going deeper from {}(…) by analyzing {}.{}(…) call with args {}", prevTask.getMethodName(),
+				log.debug("Going deeper from {}(â€¦) by analyzing {}.{}(â€¦) call with args {}", prevTask.getMethodName(),
 						invocation.getClassName(), invocation.getMethodName(), ins);
 			}
 
@@ -182,7 +182,7 @@ public class PaintingSession {
 					: invClass.getMethod(invocation.getMethodName(), invocation.getMethodSignature());
 
 			if (invMethod.isEmpty()) {
-				log.debug("Skip method {}(…) analysis (empty method)", invocation.getMethodName());
+				log.debug("Skip method {}(â€¦) analysis (empty method)", invocation.getMethodName());
 				return emptyMap();
 			}
 
@@ -228,7 +228,7 @@ public class PaintingSession {
 	private synchronized void queueImpl(final PaintingTask toQueue, QueueReason reason) {
 		if (toQueue.getResult() != null && reason != QueueReason.DEPENDENCY_UPDATE
 				&& toQueue.getResult().getVersionOfHeap() == currentHeapVersion.get()) {
-			log.debug("We have results for {}() and they are fresh enough", toQueue.getMethodName());
+			log.debug("We have results for {}(â€¦) and they are fresh enough", toQueue.getMethodName());
 			return;
 		}
 
