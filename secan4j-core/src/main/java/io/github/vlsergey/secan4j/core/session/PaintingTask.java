@@ -65,6 +65,7 @@ public class PaintingTask {
 		}
 	}
 
+	@Getter
 	@Delegate
 	private final @NonNull TaskKey arguments;
 
@@ -92,7 +93,8 @@ public class PaintingTask {
 		if (this.dependants == Collections.<PaintingTask>emptySet()) {
 			this.dependants = newSetFromMap(new WeakHashMap<>());
 		}
-		this.dependants.add(node);
+		final boolean added = this.dependants.add(node);
+		assert added;
 	}
 
 	public synchronized Collection<PaintingTask> getDependants() {
@@ -104,7 +106,13 @@ public class PaintingTask {
 	}
 
 	public synchronized void removeDependant(@NonNull PaintingTask task) {
-		this.dependants.remove(task);
+		final boolean removed = this.dependants.remove(task);
+		assert removed;
+	}
+
+	@Override
+	public String toString() {
+		return "PaintingTask [" + arguments + "]";
 	}
 
 }

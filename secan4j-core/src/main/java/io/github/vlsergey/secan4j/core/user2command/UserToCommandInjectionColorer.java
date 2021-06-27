@@ -19,25 +19,28 @@ import javassist.CtBehavior;
 import javassist.CtClass;
 import javassist.bytecode.SignatureAttribute;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 
 @AllArgsConstructor
 public class UserToCommandInjectionColorer implements ColorProvider {
 
-	private final @NonNull DataProvider dataProvider;
-
-	@AllArgsConstructor
+	@Data
 	private static final class MethodParameterTraceItem implements TraceItem {
 
-		private final CtClass ctClass;
-		private final CtBehavior ctMethod;
+		private final String className;
+		private final String methodName;
+		private final String methodSignature;
 		private final int parameterIndex;
 		private final String prefixOfMessage;
 
-		@Override
-		public TraceItem findPrevious() {
-			return null;
+		MethodParameterTraceItem(CtClass ctClass, CtBehavior ctMethod, int parameterIndex, String prefixOfMessage) {
+			this.className = ctClass.getName().intern();
+			this.methodName = ctMethod.getName().intern();
+			this.methodSignature = ctMethod.getSignature().intern();
+			this.parameterIndex = parameterIndex;
+			this.prefixOfMessage = prefixOfMessage.intern();
 		}
 
 		@Override
@@ -45,15 +48,19 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 			final LinkedHashMap<String, Object> description = new LinkedHashMap<>();
 			description.put("type", "MethodParameterAnnotations");
 
-			description.put("className", ctClass.getName());
-			description.put("methodName", ctMethod.getName());
-			description.put("methodLongName", ctMethod.getLongName());
-			description.put("methodSignature", ctMethod.getSignature());
+			description.put("className", className);
+			description.put("methodName", methodName);
+			description.put("methodSignature", methodSignature);
 			description.put("parameterIndex", parameterIndex);
 
-			description.put("message", prefixOfMessage + " argument #" + parameterIndex + " of method '"
-					+ ctMethod.getName() + "' of class " + ctClass.getName());
+			description.put("message", prefixOfMessage + " argument #" + parameterIndex + " of method '" + methodName
+					+ "' of class " + className);
 			return description;
+		}
+
+		@Override
+		public TraceItem findPrevious() {
+			return null;
 		}
 
 		@Override
@@ -62,6 +69,8 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 		}
 
 	}
+
+	private final @NonNull DataProvider dataProvider;
 
 	@Override
 	@SneakyThrows

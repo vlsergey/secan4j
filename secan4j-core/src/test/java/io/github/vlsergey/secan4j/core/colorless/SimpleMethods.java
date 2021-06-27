@@ -9,6 +9,10 @@ public class SimpleMethods {
 		return result;
 	}
 
+	public int sumThree(int a, int b, int c) {
+		return a + b + c;
+	}
+
 	public static String xOrNull(Object x) {
 		return x != null ? x.toString() : "null";
 	}

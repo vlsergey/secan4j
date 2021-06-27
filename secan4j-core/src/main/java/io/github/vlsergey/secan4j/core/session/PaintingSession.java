@@ -1,6 +1,7 @@
 package io.github.vlsergey.secan4j.core.session;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.unmodifiableSet;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -71,12 +72,14 @@ public class PaintingSession {
 				new UserToCommandInjectionColorer(dataProvider), dataProvider);
 	}
 
-	public void analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
+	public ColoredObject[][] analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
 		PaintingTask paintingTask = new PaintingTask(ctMethod, null, null);
-		queueImpl(paintingTask);
+		queueImpl(paintingTask, QueueReason.ANALYZE_REQUEST);
 
 		this.executorService.waitForAllTasksToComplete();
 		log.debug("All task completed");
+		final Result result = paintingTask.getResult();
+		return new ColoredObject[][] { result.getResultIns(), result.getResultOuts() };
 	}
 
 	protected @NonNull void executeTask(final @NonNull PaintingTask task) {
@@ -97,22 +100,26 @@ public class PaintingSession {
 					onSourceSinkIntersection);
 
 			final Set<PaintingTask> oldDependencies = task.getDependencies();
-			task.setDependencies(newDependencies);
+			task.setDependencies(unmodifiableSet(new HashSet<>(newDependencies)));
 
 			/*
 			 * update links from dependencies to task so it won't be updated on old
 			 * dependencies update
 			 */
-			newDependencies.stream().filter(dep -> !oldDependencies.contains(dep))
-					.forEach(dep -> dep.addDependant(task));
-			oldDependencies.stream().filter(dep -> !newDependencies.contains(dep))
-					.forEach(dep -> dep.removeDependant(task));
+			newDependencies.stream().filter(dep -> {
+				return !oldDependencies.contains(dep);
+			}).forEach(dep -> {
+				dep.addDependant(task);
+			});
+			oldDependencies.stream().filter(dep -> !newDependencies.contains(dep)).forEach(dep -> {
+				dep.removeDependant(task);
+			});
 
 			// TODO: here is a good place to insert cleanup callback if no task are waiting
 			// for callback from task
 
 			// schedule dependencies
-			newDependencies.forEach(this::queueImpl);
+			newDependencies.forEach(d -> this.queueImpl(d, QueueReason.DEPENDANT_REQUEST));
 
 			if (opUpdated.isEmpty()) {
 				log.warn("No results for deeper travel to {}", method);
@@ -132,8 +139,8 @@ public class PaintingSession {
 
 				// update only if not all null
 				if (hasNonNull(updated[0]) || hasNonNull(updated[1])) {
-					log.debug("…and invoke update listeners");
-					task.getDependants().forEach(this::queueImpl);
+					log.debug("…and invoke update listeners: {}", task.getDependants());
+					task.getDependants().forEach(d -> this.queueImpl(d, QueueReason.DEPENDENCY_UPDATE));
 				} else {
 					log.debug("…but skip listeners, because result is empty (colorless)");
 				}
@@ -155,8 +162,10 @@ public class PaintingSession {
 		assert outs.length == invocation.getResults().length;
 
 		try {
-			log.debug("Going deeper from {}(…) by analyzing {}.{}(…) call", prevTask.getMethodName(),
-					invocation.getClassName(), invocation.getMethodName());
+			if (log.isDebugEnabled()) {
+				log.debug("Going deeper from {}(…) by analyzing {}.{}(…) call with args {}", prevTask.getMethodName(),
+						invocation.getClassName(), invocation.getMethodName(), ins);
+			}
 
 			CtClass invClass = classPool.get(invocation.getClassName());
 
@@ -216,8 +225,9 @@ public class PaintingSession {
 		}
 	}
 
-	private synchronized void queueImpl(final PaintingTask toQueue) {
-		if (toQueue.getResult() != null && toQueue.getResult().getVersionOfHeap() == currentHeapVersion.get()) {
+	private synchronized void queueImpl(final PaintingTask toQueue, QueueReason reason) {
+		if (toQueue.getResult() != null && reason != QueueReason.DEPENDENCY_UPDATE
+				&& toQueue.getResult().getVersionOfHeap() == currentHeapVersion.get()) {
 			log.debug("We have results for {}() and they are fresh enough", toQueue.getMethodName());
 			return;
 		}

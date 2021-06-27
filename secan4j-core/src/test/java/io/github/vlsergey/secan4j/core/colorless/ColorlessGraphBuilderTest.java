@@ -30,4 +30,24 @@ class ColorlessGraphBuilderTest {
 		assertEquals(2, graph.getMethodReturnNodes()[0].inputs.length);
 	}
 
+	@Test
+	void testSumThree() throws Exception {
+		final CtClass ctClass = classPool.get(SimpleMethods.class.getName());
+		final CtMethod ctMethod = ctClass.getDeclaredMethod("sumThree");
+
+		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod).orElse(null);
+
+		assertEquals(4, graph.getMethodParamNodes().length);
+		assertEquals(Type.get(ctClass), graph.getMethodParamNodes()[0].type);
+		assertEquals(Type.INTEGER, graph.getMethodParamNodes()[1].type);
+		assertEquals(Type.INTEGER, graph.getMethodParamNodes()[2].type);
+		assertEquals(Type.INTEGER, graph.getMethodParamNodes()[3].type);
+
+		assertEquals(1, graph.getMethodReturnNodes().length);
+		assertEquals(Type.INTEGER, graph.getMethodReturnNodes()[0].type);
+
+		final DataNode[] allNodes = graph.getAllNodes();
+		assertEquals(6, allNodes.length);
+	}
+
 }

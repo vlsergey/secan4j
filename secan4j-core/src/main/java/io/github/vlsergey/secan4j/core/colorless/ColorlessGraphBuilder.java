@@ -242,6 +242,10 @@ public class ColorlessGraphBuilder {
 		List<PutFieldNode> putFieldNodes = new ArrayList<>();
 		List<PutStaticNode> putStaticNodes = new ArrayList<>();
 
+		final Set<DataNode> allNodesSet = new LinkedHashSet<>();
+		allNodesSet.addAll(currentStack);
+		allNodesSet.addAll(Arrays.asList(currentLocals));
+
 		int index;
 		iterator.move(firstPos);
 
@@ -307,6 +311,9 @@ public class ColorlessGraphBuilder {
 						}
 					});
 
+			allNodesSet.addAll(currentStack);
+			allNodesSet.addAll(Arrays.asList(currentLocals));
+
 			int nextIndex = iterator.lookAhead();
 			if (nextIndex < firstPos + length) {
 				final Frame nextFrame = controlFlow.frameAt(nextIndex);
@@ -326,18 +333,11 @@ public class ColorlessGraphBuilder {
 			}
 		}
 
-		Set<DataNode> allNodesSet = new LinkedHashSet<>();
-		for (DataNode node : incLocalNodes)
-			allNodesSet.add(node);
-		for (DataNode node : currentLocals)
-			allNodesSet.add(node);
-		allNodesSet.addAll(incStack);
-		allNodesSet.addAll(currentStack);
-		final DataNode[] allNodes = allNodesSet.toArray(DataNode[]::new);
+		allNodesSet.remove(null);
 
-		return new BlockDataGraph(allNodes, incLocalNodes, incStack, invokations.toArray(Invocation[]::new),
-				DataNode.EMPTY_DATA_NODES, DataNode.EMPTY_DATA_NODES, currentLocals,
-				toReturn == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { toReturn }, currentStack,
+		return new BlockDataGraph(allNodesSet.toArray(DataNode[]::new), incLocalNodes, incStack,
+				invokations.toArray(Invocation[]::new), DataNode.EMPTY_DATA_NODES, DataNode.EMPTY_DATA_NODES,
+				currentLocals, toReturn == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { toReturn }, currentStack,
 				putFieldNodes.toArray(PutFieldNode[]::new), putStaticNodes.toArray(PutStaticNode[]::new));
 	}
 

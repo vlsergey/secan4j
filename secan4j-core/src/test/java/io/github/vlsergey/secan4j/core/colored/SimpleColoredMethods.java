@@ -11,4 +11,8 @@ public class SimpleColoredMethods {
 		return result;
 	}
 
+	public void append(@UserProvided String src, StringBuilder dst) {
+		dst.append(src);
+	}
+
 }

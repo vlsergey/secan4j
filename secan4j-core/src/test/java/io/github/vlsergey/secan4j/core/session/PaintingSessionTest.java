@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colored.SimpleColoredMethods;
 import javassist.ClassPool;
 import javassist.CtClass;
@@ -14,6 +15,19 @@ class PaintingSessionTest {
 	private final ClassPool classPool = ClassPool.getDefault();
 
 	@Test
+	void testAppend() throws Exception {
+		final CtClass ctClass = classPool.get(SimpleColoredMethods.class.getName());
+		final CtMethod ctMethod = ctClass.getDeclaredMethod("append");
+
+		PaintingSession paintingSession = new PaintingSession(classPool, (source, sink) -> {
+			fail("We din't expect intersection to be found so soon");
+		});
+
+		final ColoredObject[][] result = paintingSession.analyze(ctMethod);
+		System.out.println(result);
+	}
+
+	@Test
 	void testConcatenation() throws Exception {
 		final CtClass ctClass = classPool.get(SimpleColoredMethods.class.getName());
 		final CtMethod ctMethod = ctClass.getDeclaredMethod("concatenation");
@@ -22,7 +36,8 @@ class PaintingSessionTest {
 			fail("We din't expect intersection to be found so soon");
 		});
 
-		paintingSession.analyze(ctMethod);
+		final ColoredObject[][] result = paintingSession.analyze(ctMethod);
+		System.out.println(result);
 	}
 
 }
