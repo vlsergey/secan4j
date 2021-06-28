@@ -179,9 +179,14 @@ public class PaintingSession {
 
 			if (!invocation.isStaticCall() && ins[0] != null && ins[0].getSeenClassesHere().size() == 1) {
 				final String refinedClassName = ins[0].getSeenClassesHere().iterator().next();
+
 				if (!refinedClassName.equals(invocation.getClassName())) {
-					log.debug("Refine 'this' class from {} to {}", invocation.getClassName(), refinedClassName);
-					invClass = classPool.get(refinedClassName);
+					// make sense only if refined class is more specific than original
+					final CtClass refinedClass = classPool.get(refinedClassName);
+					if (refinedClass.subtypeOf(invClass)) {
+						log.debug("Refine 'this' class from {} to {}", invocation.getClassName(), refinedClassName);
+						invClass = refinedClass;
+					}
 				}
 			}
 
