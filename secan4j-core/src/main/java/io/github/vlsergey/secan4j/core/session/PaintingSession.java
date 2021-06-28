@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Functions;
 
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
@@ -76,14 +78,14 @@ public class PaintingSession {
 				new UserToCommandInjectionColorer(dataProvider), dataProvider);
 	}
 
-	public ColoredObject[][] analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
+	public @Nullable ColoredObject[][] analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
 		PaintingTask paintingTask = new PaintingTask(ctMethod, null, null);
 		queueImpl(paintingTask, QueueReason.ANALYZE_REQUEST);
 
 		this.executorService.waitForAllTasksToComplete();
 		log.debug("All task completed");
 		final Result result = paintingTask.getResult();
-		return new ColoredObject[][] { result.getResultIns(), result.getResultOuts() };
+		return result == null ? null : new ColoredObject[][] { result.getResultIns(), result.getResultOuts() };
 	}
 
 	protected @NonNull void executeTask(final @NonNull PaintingTask task) {
