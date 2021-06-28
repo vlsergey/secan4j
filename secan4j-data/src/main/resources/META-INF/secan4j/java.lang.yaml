@@ -1,3 +1,7 @@
+AbstractStringBuilder:
+  value: ParentAttributesDefiner
+String:
+  value: ParentAttributesDefiner
 System:
   arraycopy:
     arguments:

@@ -1,5 +1,7 @@
 package io.github.vlsergey.secan4j.core.colored.brushes;
 
+import static java.util.Collections.emptyMap;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,6 +32,9 @@ public class CopierBrush implements ColorPaintBrush {
 	@Override
 	public @NonNull Map<DataNode, ColoredObject> doTouch(@NonNull BlockDataGraph colorlessGraph,
 			@NonNull Map<DataNode, ColoredObject> oldColors) {
+		if (oldColors.isEmpty()) {
+			return emptyMap();
+		}
 
 		Map<DataNode, ColoredObject> newColors = new HashMap<>();
 
@@ -39,8 +44,8 @@ public class CopierBrush implements ColorPaintBrush {
 			final Set<Class<?>>[] forMethodArguments = dataProvider.getForMethodArguments(invocation.getClassName(),
 					invocation.getClassName(), invocation.getMethodSignature());
 
-			if (forMethodResult.contains(CopyAttributesTo.class)
-					|| Arrays.stream(forMethodArguments).anyMatch(s -> s != null && s.contains(CopyAttributesTo.class))) {
+			if (forMethodResult.contains(CopyAttributesTo.class) || Arrays.stream(forMethodArguments)
+					.anyMatch(s -> s != null && s.contains(CopyAttributesTo.class))) {
 				// yes, we have copy-colors annotation
 				List<DataNode> sources = new ArrayList<>(1);
 				List<DataNode> targets = new ArrayList<>(1);

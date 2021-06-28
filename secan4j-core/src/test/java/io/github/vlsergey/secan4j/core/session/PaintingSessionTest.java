@@ -2,6 +2,8 @@ package io.github.vlsergey.secan4j.core.session;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
@@ -24,7 +26,7 @@ class PaintingSessionTest {
 		});
 
 		final ColoredObject[][] result = paintingSession.analyze(ctMethod);
-		System.out.println(result);
+		System.out.println(Arrays.toString(result));
 	}
 
 	@Test

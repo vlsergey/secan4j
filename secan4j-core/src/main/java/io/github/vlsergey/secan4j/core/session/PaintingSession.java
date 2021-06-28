@@ -24,6 +24,7 @@ import io.github.vlsergey.secan4j.core.colored.GraphColorer;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colored.brushes.ColorPaintBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.CopierBrush;
+import io.github.vlsergey.secan4j.core.colored.brushes.ParentAttributesDefinerBrush;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
@@ -73,7 +74,8 @@ public class PaintingSession {
 		this.classPool = classPool;
 		this.dataProvider = new DataProvider();
 
-		final List<ColorPaintBrush> brushes = Arrays.asList(new CopierBrush(dataProvider));
+		final List<ColorPaintBrush> brushes = Arrays.asList(new CopierBrush(dataProvider),
+				new ParentAttributesDefinerBrush(dataProvider));
 		this.graphColorer = new GraphColorer(brushes, classPool, new ColorlessGraphBuilder(),
 				new UserToCommandInjectionColorer(dataProvider), dataProvider);
 	}

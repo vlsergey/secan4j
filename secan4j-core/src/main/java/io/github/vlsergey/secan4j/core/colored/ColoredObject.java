@@ -52,7 +52,7 @@ public class ColoredObject {
 		demultiplex(src, Arrays.copyOf(src, src.length), 0, consumer);
 	}
 
-	static ColoredObject forRootOnly(final @NonNull CtClass cls, PaintedColor color) {
+	public static ColoredObject forRootOnly(final @NonNull CtClass cls, PaintedColor color) {
 		return new ColoredObject(color, emptyMap(), null, singleton(cls.getName().intern()));
 	}
 

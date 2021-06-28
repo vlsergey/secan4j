@@ -11,6 +11,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import javax.annotation.Nullable;
+
 import javassist.bytecode.BadBytecode;
 import javassist.bytecode.SignatureAttribute;
 import lombok.AccessLevel;
@@ -23,6 +25,10 @@ public class SecanData {
 
 	private interface ClassConfigNode extends SimpleConfigNode {
 		default @NonNull Set<Class<?>> getAsForAnnotation() {
+			return getAsForSingleElement();
+		}
+
+		default @NonNull Set<Class<?>> getForField(String fieldName, String signature) {
 			return getAsForSingleElement();
 		}
 
@@ -87,6 +93,23 @@ public class SecanData {
 					() -> new UnsupportedOperationException("Unsupported configuration format for method " + methodName
 							+ " (" + data.getClass().getName() + ")"));
 			return methodNode;
+		}
+
+		@Override
+		public @NonNull Set<Class<?>> getForField(String fieldName, String signature) {
+			return getForFieldImpl(fieldName, signature).getAsForSingleElement();
+		}
+
+		private SimpleConfigNode getForFieldImpl(String fieldName, String signature) {
+			final Object forField = data.get(fieldName);
+			if (forField == null) {
+				return EmptyConfigNode.INSTANCE;
+			}
+
+			SimpleConfigNode fieldNode = toConfigNode(forField, StringData::new, ListData::new, null,
+					() -> new UnsupportedOperationException("Unsupported configuration format for field " + fieldName
+							+ " (" + data.getClass().getName() + ")"));
+			return fieldNode;
 		}
 
 		@Override
@@ -208,7 +231,7 @@ public class SecanData {
 
 	@SuppressWarnings("unchecked")
 	private static <T> T toConfigNode(final @NonNull Object src, final @NonNull Function<String, T> fromString,
-			final @NonNull Function<List<String>, T> fromList, final @NonNull Function<Map<String, ?>, T> fromMap,
+			final @NonNull Function<List<String>, T> fromList, final @Nullable Function<Map<String, ?>, T> fromMap,
 			final @NonNull Supplier<UnsupportedOperationException> exc) {
 		if (src instanceof String) {
 			return fromString.apply((String) src);
@@ -216,7 +239,7 @@ public class SecanData {
 		if (src instanceof List) {
 			return fromList.apply((List<String>) src);
 		}
-		if (src instanceof Map) {
+		if (src instanceof Map && fromMap != null) {
 			return fromMap.apply((Map<String, ?>) src);
 		}
 		throw exc.get();
@@ -252,6 +275,11 @@ public class SecanData {
 		return toConfigNode(currentNode, StringData::new, ListData::new, MapAsClassData::new,
 				() -> new UnsupportedOperationException(
 						"Unsupported configuration format for " + fqcn + " (" + data.getClass().getName() + ")"));
+	}
+
+	@SneakyThrows
+	public Set<Class<?>> getForField(String fqcn, String fieldName, String signature) {
+		return getForClass(fqcn).getForField(fieldName, signature);
 	}
 
 	@SneakyThrows

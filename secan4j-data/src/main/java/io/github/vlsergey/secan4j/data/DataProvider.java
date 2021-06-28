@@ -78,6 +78,11 @@ public class DataProvider {
 		return getDataForClass(fqcn).getForMethodResult(fqcn, methodName, methodSignature);
 	}
 
+	public @NonNull Set<Class<?>> getForField(final @NonNull String fqcn, final @NonNull String fieldName,
+			final @NonNull String fieldSignature) {
+		return getDataForClass(fqcn).getForField(fqcn, fieldName, fieldSignature);
+	}
+
 	protected List<ResourcePathCandidate> getResourcePathCandidates(String fqcn) {
 		final StringBuilder builder = new StringBuilder();
 		final List<String> tokens = new ArrayList<>();
