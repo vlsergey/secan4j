@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
 @Inherited
 @Retention(RUNTIME)
 @Target({ FIELD, PARAMETER, METHOD })
-public @interface CopyColorsTo {
+public @interface CopyAttributesTo {
 
     OnIntersection value() default OnIntersection.REPORT;
 

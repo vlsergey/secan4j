@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import io.github.vlsergey.secan4j.annotations.Command;
-import io.github.vlsergey.secan4j.annotations.CopyColorsFrom;
-import io.github.vlsergey.secan4j.annotations.CopyColorsTo;
+import io.github.vlsergey.secan4j.annotations.CopyAttributesFrom;
+import io.github.vlsergey.secan4j.annotations.CopyAttributesTo;
 import io.github.vlsergey.secan4j.annotations.UserProvided;
 import javassist.ClassPool;
 import javassist.CtMethod;
@@ -33,8 +33,8 @@ class SecanDataTest {
 		final Set<Class<?>>[] args = new DataProvider().getForMethodArguments(System.class.getName(),
 				ctMethod.getName(), ctMethod.getSignature());
 
-		assertEquals(singleton(CopyColorsFrom.class), args[0]);
-		assertEquals(singleton(CopyColorsTo.class), args[2]);
+		assertEquals(singleton(CopyAttributesFrom.class), args[0]);
+		assertEquals(singleton(CopyAttributesTo.class), args[2]);
 	}
 
 	@Test

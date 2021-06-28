@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-import io.github.vlsergey.secan4j.annotations.CopyColorsFrom;
-import io.github.vlsergey.secan4j.annotations.CopyColorsTo;
+import io.github.vlsergey.secan4j.annotations.CopyAttributesFrom;
+import io.github.vlsergey.secan4j.annotations.CopyAttributesTo;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
@@ -19,8 +19,8 @@ import lombok.AllArgsConstructor;
 import lombok.NonNull;
 
 /**
- * @see CopyColorsFrom
- * @see CopyColorsTo
+ * @see CopyAttributesFrom
+ * @see CopyAttributesTo
  */
 @AllArgsConstructor
 public class CopierBrush implements ColorPaintBrush {
@@ -39,15 +39,15 @@ public class CopierBrush implements ColorPaintBrush {
 			final Set<Class<?>>[] forMethodArguments = dataProvider.getForMethodArguments(invocation.getClassName(),
 					invocation.getClassName(), invocation.getMethodSignature());
 
-			if (forMethodResult.contains(CopyColorsTo.class)
-					|| Arrays.stream(forMethodArguments).anyMatch(s -> s != null && s.contains(CopyColorsTo.class))) {
+			if (forMethodResult.contains(CopyAttributesTo.class)
+					|| Arrays.stream(forMethodArguments).anyMatch(s -> s != null && s.contains(CopyAttributesTo.class))) {
 				// yes, we have copy-colors annotation
 				List<DataNode> sources = new ArrayList<>(1);
 				List<DataNode> targets = new ArrayList<>(1);
-				if (forMethodResult.contains(CopyColorsFrom.class)) {
+				if (forMethodResult.contains(CopyAttributesFrom.class)) {
 					sources.addAll(Arrays.asList(invocation.getResults()));
 				}
-				if (forMethodResult.contains(CopyColorsTo.class)) {
+				if (forMethodResult.contains(CopyAttributesTo.class)) {
 					targets.addAll(Arrays.asList(invocation.getResults()));
 				}
 				for (int i = 0; i < Math.min(invocation.getParameters().length, forMethodArguments.length); i++) {
@@ -55,10 +55,10 @@ public class CopierBrush implements ColorPaintBrush {
 					if (forArg == null || forArg.isEmpty()) {
 						continue;
 					}
-					if (forArg.contains(CopyColorsFrom.class)) {
+					if (forArg.contains(CopyAttributesFrom.class)) {
 						sources.add(invocation.getParameters()[i]);
 					}
-					if (forArg.contains(CopyColorsTo.class)) {
+					if (forArg.contains(CopyAttributesTo.class)) {
 						targets.add(invocation.getParameters()[i]);
 					}
 				}
