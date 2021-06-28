@@ -15,7 +15,6 @@ import io.github.vlsergey.secan4j.annotations.CopyColorsTo;
 import io.github.vlsergey.secan4j.annotations.UserProvided;
 import javassist.ClassPool;
 import javassist.CtMethod;
-import javassist.bytecode.SignatureAttribute;
 import lombok.NonNull;
 
 class SecanDataTest {
@@ -31,9 +30,8 @@ class SecanDataTest {
 	void testGetForMethodArguments_arraycopy() throws Exception {
 		final CtMethod ctMethod = new ClassPool(true).getMethod(System.class.getName(), "arraycopy");
 
-		final @NonNull SecanData data = new DataProvider().getDataForClassImpl(System.class.getName());
-		final Set<Class<?>>[] args = data.getForMethodArguments(System.class.getName(), ctMethod.getName(),
-				SignatureAttribute.toMethodSignature(ctMethod.getSignature()));
+		final Set<Class<?>>[] args = new DataProvider().getForMethodArguments(System.class.getName(),
+				ctMethod.getName(), ctMethod.getSignature());
 
 		assertEquals(singleton(CopyColorsFrom.class), args[0]);
 		assertEquals(singleton(CopyColorsTo.class), args[2]);
@@ -43,9 +41,8 @@ class SecanDataTest {
 	void testGetForMethodArguments_prepareStatement() throws Exception {
 		final CtMethod ctMethod = new ClassPool(true).getMethod(Connection.class.getName(), "prepareStatement");
 
-		final @NonNull SecanData data = new DataProvider().getDataForClassImpl(Connection.class.getName());
-		final Set<Class<?>>[] args = data.getForMethodArguments(Connection.class.getName(), ctMethod.getName(),
-				SignatureAttribute.toMethodSignature(ctMethod.getSignature()));
+		final Set<Class<?>>[] args = new DataProvider().getForMethodArguments(Connection.class.getName(),
+				ctMethod.getName(), ctMethod.getSignature());
 
 		assertEquals(singleton(Command.class), args[0]);
 	}

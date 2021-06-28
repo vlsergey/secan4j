@@ -1,5 +1,6 @@
 package io.github.vlsergey.secan4j.core.colored;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -23,7 +24,7 @@ public class GraphColorerTest {
 	private final ClassPool classPool = ClassPool.getDefault();
 	private final ColorlessGraphBuilder colorlessGraphBuilder = new ColorlessGraphBuilder();
 	private final DataProvider dataProvider = new DataProvider();
-	private final GraphColorer graphColorer = new GraphColorer(classPool, colorlessGraphBuilder,
+	private final GraphColorer graphColorer = new GraphColorer(emptyList(), classPool, colorlessGraphBuilder,
 			new UserToCommandInjectionColorer(dataProvider), dataProvider);
 
 	@Test

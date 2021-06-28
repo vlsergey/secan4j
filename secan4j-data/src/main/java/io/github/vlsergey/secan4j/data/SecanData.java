@@ -7,12 +7,12 @@ import static java.util.stream.Collectors.toSet;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import javassist.bytecode.SignatureAttribute.MethodSignature;
+import javassist.bytecode.BadBytecode;
+import javassist.bytecode.SignatureAttribute;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
@@ -26,14 +26,16 @@ public class SecanData {
 			return getAsForSingleElement();
 		}
 
-		default @NonNull Set<Class<?>>[] getForMethodArguments(String methodName, MethodSignature signature) {
+		default @NonNull Set<Class<?>>[] getForMethodArguments(String methodName, String signature) throws BadBytecode {
+			final int paramsLength = SignatureAttribute.toMethodSignature(signature).getParameterTypes().length;
+
 			@SuppressWarnings("unchecked")
-			Set<Class<?>>[] result = new Set[signature.getParameterTypes().length];
+			Set<Class<?>>[] result = new Set[paramsLength];
 			Arrays.fill(result, emptySet());
 			return result;
 		}
 
-		default @NonNull Set<Class<?>> getForMethodResult(String methodName, MethodSignature signature) {
+		default @NonNull Set<Class<?>> getForMethodResult(String methodName, String signature) {
 			return getAsForSingleElement();
 		}
 	}
@@ -59,7 +61,7 @@ public class SecanData {
 		}
 
 		@Override
-		public @NonNull Set<Class<?>> getForMethodResult(MethodSignature signature) {
+		public @NonNull Set<Class<?>> getForMethodResult(String signature) {
 			return data.stream().map(SecanData::toAnnotationClass).collect(toSet());
 		}
 	}
@@ -88,12 +90,12 @@ public class SecanData {
 		}
 
 		@Override
-		public @NonNull Set<Class<?>>[] getForMethodArguments(String methodName, MethodSignature signature) {
+		public @NonNull Set<Class<?>>[] getForMethodArguments(String methodName, String signature) throws BadBytecode {
 			return getForMethod(methodName).getForMethodArguments(signature);
 		}
 
 		@Override
-		public Set<Class<?>> getForMethodResult(String methodName, MethodSignature signature) {
+		public Set<Class<?>> getForMethodResult(String methodName, String signature) {
 			return getForMethod(methodName).getForMethodResult(signature);
 		}
 	}
@@ -118,15 +120,15 @@ public class SecanData {
 
 		@Override
 		@SuppressWarnings("unchecked")
-		public @NonNull Set<Class<?>>[] getForMethodArguments(MethodSignature signature) {
+		public @NonNull Set<Class<?>>[] getForMethodArguments(String signature) {
 			// TODO: support for overrides
 
 			if (data.containsKey("arguments")) {
 				// must be a list or a string
 				List<?> list = (List<?>) data.get("arguments");
 				// must be strings OR lists of strings
-				return list.stream()
-						.map(x -> x == null ? null : SecanData
+				return list.stream().map(x -> x == null ? null
+						: SecanData
 								.toConfigNode(x, StringData::new, ListData::new, (any) -> EmptyConfigNode.INSTANCE,
 										() -> new UnsupportedOperationException(
 												"Unsupported configuration format for result of method override "
@@ -140,10 +142,10 @@ public class SecanData {
 		}
 
 		@Override
-		public @NonNull Set<Class<?>> getForMethodResult(MethodSignature signature) {
-			if (data.containsKey(signature.encode())) {
+		public @NonNull Set<Class<?>> getForMethodResult(String signature) {
+			if (data.containsKey(signature)) {
 				return SecanData
-						.<SimpleConfigNode>toConfigNode(data.get(signature.encode()), StringData::new, ListData::new,
+						.<SimpleConfigNode>toConfigNode(data.get(signature), StringData::new, ListData::new,
 								(any) -> EmptyConfigNode.INSTANCE,
 								() -> new UnsupportedOperationException(
 										"Unsupported configuration format for method override with signature '"
@@ -161,14 +163,16 @@ public class SecanData {
 	 */
 	private interface MethodOverridesConfigNode extends SimpleConfigNode {
 
-		default @NonNull Set<Class<?>>[] getForMethodArguments(MethodSignature signature) {
+		default @NonNull Set<Class<?>>[] getForMethodArguments(String signature) throws BadBytecode {
+			final int paramsLength = SignatureAttribute.toMethodSignature(signature).getParameterTypes().length;
+
 			@SuppressWarnings("unchecked")
-			Set<Class<?>>[] result = new Set[signature.getParameterTypes().length];
+			Set<Class<?>>[] result = new Set[paramsLength];
 			Arrays.fill(result, emptySet());
 			return result;
 		}
 
-		default @NonNull Set<Class<?>> getForMethodResult(MethodSignature signature) {
+		default @NonNull Set<Class<?>> getForMethodResult(String signature) {
 			return getAsForSingleElement();
 		}
 	}
@@ -191,7 +195,7 @@ public class SecanData {
 		}
 
 		@Override
-		public @NonNull Set<Class<?>> getForMethodResult(MethodSignature signature) {
+		public @NonNull Set<Class<?>> getForMethodResult(String signature) {
 			return singleton(toAnnotationClass(data));
 		}
 
@@ -251,12 +255,12 @@ public class SecanData {
 	}
 
 	@SneakyThrows
-	public Set<Class<?>>[] getForMethodArguments(String fqcn, String methodName, MethodSignature signature) {
+	public Set<Class<?>>[] getForMethodArguments(String fqcn, String methodName, String signature) {
 		return getForClass(fqcn).getForMethodArguments(methodName, signature);
 	}
 
 	@SneakyThrows
-	public Set<Class<?>> getForMethodResult(String fqcn, String methodName, MethodSignature signature) {
+	public Set<Class<?>> getForMethodResult(String fqcn, String methodName, String signature) {
 		return getForClass(fqcn).getForMethodResult(methodName, signature);
 	}
 

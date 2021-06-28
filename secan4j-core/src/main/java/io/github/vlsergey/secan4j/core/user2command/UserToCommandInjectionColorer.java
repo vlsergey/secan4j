@@ -17,7 +17,6 @@ import io.github.vlsergey.secan4j.data.DataProvider;
 import io.github.vlsergey.secan4j.data.SecanData;
 import javassist.CtBehavior;
 import javassist.CtClass;
-import javassist.bytecode.SignatureAttribute;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
@@ -109,7 +108,7 @@ public class UserToCommandInjectionColorer implements ColorProvider {
 
 		final @NonNull SecanData secanData = dataProvider.getDataForClass(ctClass.getName());
 		final Set<Class<?>>[] forAllMethodArguments = secanData.getForMethodArguments(ctClass.getName(),
-				ctMethod.getName(), SignatureAttribute.toMethodSignature(ctMethod.getSignature()));
+				ctMethod.getName(), ctMethod.getSignature());
 		if (forAllMethodArguments != null && forAllMethodArguments.length > parameterIndex
 				&& forAllMethodArguments[parameterIndex] != null && !forAllMethodArguments[parameterIndex].isEmpty()) {
 			final Set<Class<?>> data = forAllMethodArguments[parameterIndex];

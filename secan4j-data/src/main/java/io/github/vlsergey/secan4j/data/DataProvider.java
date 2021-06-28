@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -45,7 +46,7 @@ public class DataProvider {
 	private final ObjectMapper yamlObjectMapper = new ObjectMapper(new YAMLFactory());
 
 	@SneakyThrows
-	public @NonNull SecanData getDataForClass(@NonNull String fqcn) {
+	public @NonNull SecanData getDataForClass(final @NonNull String fqcn) {
 		return clsToData.get(fqcn, () -> getDataForClassImpl(fqcn));
 	}
 
@@ -65,6 +66,16 @@ public class DataProvider {
 			}
 		}
 		return EMPTY;
+	}
+
+	public @NonNull Set<Class<?>>[] getForMethodArguments(final @NonNull String fqcn, final @NonNull String methodName,
+			final @NonNull String methodSignature) {
+		return getDataForClass(fqcn).getForMethodArguments(fqcn, methodName, methodSignature);
+	}
+
+	public @NonNull Set<Class<?>> getForMethodResult(final @NonNull String fqcn, final @NonNull String methodName,
+			final @NonNull String methodSignature) {
+		return getDataForClass(fqcn).getForMethodResult(fqcn, methodName, methodSignature);
 	}
 
 	protected List<ResourcePathCandidate> getResourcePathCandidates(String fqcn) {

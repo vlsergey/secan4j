@@ -6,6 +6,7 @@ import static java.util.Collections.unmodifiableSet;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -19,6 +20,8 @@ import com.google.common.base.Functions;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colored.GraphColorer;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
+import io.github.vlsergey.secan4j.core.colored.brushes.ColorPaintBrush;
+import io.github.vlsergey.secan4j.core.colored.brushes.CopierBrush;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
@@ -68,7 +71,8 @@ public class PaintingSession {
 		this.classPool = classPool;
 		this.dataProvider = new DataProvider();
 
-		this.graphColorer = new GraphColorer(classPool, new ColorlessGraphBuilder(),
+		final List<ColorPaintBrush> brushes = Arrays.asList(new CopierBrush(dataProvider));
+		this.graphColorer = new GraphColorer(brushes, classPool, new ColorlessGraphBuilder(),
 				new UserToCommandInjectionColorer(dataProvider), dataProvider);
 	}
 

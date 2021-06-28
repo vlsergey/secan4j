@@ -2,21 +2,18 @@ package io.github.vlsergey.secan4j.core.colored;
 
 import static java.util.Collections.unmodifiableMap;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
-import io.github.vlsergey.secan4j.annotations.CopyColorsFrom;
-import io.github.vlsergey.secan4j.annotations.CopyColorsTo;
+import io.github.vlsergey.secan4j.core.colored.brushes.ColorPaintBrush;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
@@ -28,7 +25,6 @@ import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
 import javassist.NotFoundException;
-import javassist.bytecode.SignatureAttribute;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NonNull;
@@ -38,6 +34,8 @@ import lombok.extern.slf4j.Slf4j;
 @AllArgsConstructor
 @Slf4j
 public class GraphColorer {
+
+	private final @NonNull List<ColorPaintBrush> brushes;
 
 	private final @NonNull ClassPool classPool;
 
@@ -207,6 +205,17 @@ public class GraphColorer {
 			// TODO: optimize by checking only changed nodes
 			final Map<DataNode, ColoredObject> newColors = new HashMap<>();
 
+			final Map<DataNode, ColoredObject> oldColors = unmodifiableMap(colors);
+			for (ColorPaintBrush brush : this.brushes) {
+				Map<DataNode, ColoredObject> afterTouch = brush.doTouch(colorlessGraph, oldColors);
+				afterTouch.forEach((node, newColor) -> {
+					ColoredObject prev = colors.get(node);
+					if (prev == null || !prev.equals(newColor)) {
+						newColors.put(node, newColor);
+					}
+				});
+			}
+
 			for (DataNode dataNode : colorlessGraph.getAllNodes()) {
 				if (dataNode instanceof GetFieldNode) {
 					GetFieldNode getField = ((GetFieldNode) dataNode);
@@ -230,44 +239,6 @@ public class GraphColorer {
 						newColors.put(node, newColor);
 					}
 				});
-
-				final Set<Class<?>> forMethodResult = dataProvider.getDataForClass(invocation.getClassName())
-						.getForMethodResult(invocation.getClassName(), invocation.getMethodName(),
-								SignatureAttribute.toMethodSignature(invocation.getMethodSignature()));
-				final Set<Class<?>>[] forMethodArguments = dataProvider.getDataForClass(invocation.getClassName())
-						.getForMethodArguments(invocation.getClassName(), invocation.getMethodName(),
-								SignatureAttribute.toMethodSignature(invocation.getMethodSignature()));
-
-				if (forMethodResult.contains(CopyColorsTo.class) || Arrays.stream(forMethodArguments)
-						.anyMatch(s -> s != null && s.contains(CopyColorsTo.class))) {
-					// yes, we have copy-colors annotation
-					List<DataNode> sources = new ArrayList<>(1);
-					List<DataNode> targets = new ArrayList<>(1);
-					if (forMethodResult.contains(CopyColorsFrom.class)) {
-						sources.addAll(Arrays.asList(invocation.getResults()));
-					}
-					if (forMethodResult.contains(CopyColorsTo.class)) {
-						targets.addAll(Arrays.asList(invocation.getResults()));
-					}
-					for (int i = 0; i < Math.min(invocation.getParameters().length, forMethodArguments.length); i++) {
-						final Set<Class<?>> forArg = forMethodArguments[i];
-						if (forArg == null || forArg.isEmpty()) {
-							continue;
-						}
-						if (forArg.contains(CopyColorsFrom.class)) {
-							sources.add(invocation.getParameters()[i]);
-						}
-						if (forArg.contains(CopyColorsTo.class)) {
-							targets.add(invocation.getParameters()[i]);
-						}
-					}
-
-					assert sources.size() == 1 : "sources.size() != 1 (NYI)";
-					assert targets.size() == 1 : "targets.size() != 1 (NYI)";
-
-					copyColor(colors, sources.get(0), Function.identity(), targets.get(0), newColors);
-				}
-
 			}
 
 			hasChanges = !newColors.isEmpty();
