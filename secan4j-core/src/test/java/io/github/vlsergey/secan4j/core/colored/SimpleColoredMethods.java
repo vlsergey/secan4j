@@ -15,4 +15,8 @@ public class SimpleColoredMethods {
 		dst.append(src);
 	}
 
+	public void arraycopy(@UserProvided byte[] src, byte[] dst) {
+		System.arraycopy(src, 0, dst, 0, src.length);
+	}
+
 }

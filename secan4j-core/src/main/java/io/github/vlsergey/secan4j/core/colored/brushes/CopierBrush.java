@@ -42,7 +42,7 @@ public class CopierBrush implements ColorPaintBrush {
 			final Set<Class<?>> forMethodResult = dataProvider.getForMethodResult(invocation.getClassName(),
 					invocation.getClassName(), invocation.getMethodSignature());
 			final Set<Class<?>>[] forMethodArguments = dataProvider.getForMethodArguments(invocation.getClassName(),
-					invocation.getClassName(), invocation.getMethodSignature());
+					invocation.getMethodName(), invocation.getMethodSignature());
 
 			if (forMethodResult.contains(CopyAttributesTo.class) || Arrays.stream(forMethodArguments)
 					.anyMatch(s -> s != null && s.contains(CopyAttributesTo.class))) {
