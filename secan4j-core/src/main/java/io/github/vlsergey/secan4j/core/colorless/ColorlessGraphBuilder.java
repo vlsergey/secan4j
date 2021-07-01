@@ -208,11 +208,21 @@ public class ColorlessGraphBuilder {
 		}
 
 		final Collection<BlockDataGraph> doneGraphs = done.values();
-		final DataNode[] allNodes = collect(doneGraphs, BlockDataGraph::getAllNodes, DataNode[]::new);
+		DataNode[] allNodes = collect(doneGraphs, BlockDataGraph::getAllNodes, DataNode[]::new);
 		final DataNode[] outputs = collect(doneGraphs, BlockDataGraph::getOutReturns, DataNode[]::new);
 		final Invocation[] invokations = collect(doneGraphs, BlockDataGraph::getInvokations, Invocation[]::new);
-		final DataNode[] methodReturnNodes = outputs.length < 2 ? outputs
-				: new DataNode[] { new AnyOfNode().setInputs(outputs).setType(getMergedType(outputs)) };
+
+		final DataNode[] methodReturnNodes;
+		if (outputs.length < 2)
+			methodReturnNodes = outputs;
+		else {
+			final DataNode compositionNode = new AnyOfNode().setInputs(outputs).setType(getMergedType(outputs));
+			methodReturnNodes = new DataNode[] { compositionNode };
+
+			allNodes = Arrays.copyOf(allNodes, allNodes.length + 1);
+			allNodes[allNodes.length - 1] = compositionNode;
+		}
+
 		final PutFieldNode[] putFieldNodes = collect(doneGraphs, BlockDataGraph::getPutFieldNodes, PutFieldNode[]::new);
 		final PutStaticNode[] putStaticNodes = collect(doneGraphs, BlockDataGraph::getPutStaticNodes,
 				PutStaticNode[]::new);

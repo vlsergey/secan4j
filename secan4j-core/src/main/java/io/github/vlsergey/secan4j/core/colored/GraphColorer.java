@@ -205,7 +205,8 @@ public class GraphColorer {
 
 			final Map<DataNode, ColoredObject> oldColors = unmodifiableMap(colors);
 			for (ColorPaintBrush brush : this.brushes) {
-				Map<DataNode, ColoredObject> afterTouch = brush.doTouch(colorlessGraph, oldColors);
+				Map<DataNode, ColoredObject> afterTouch = brush.doTouch(colorlessGraph, oldColors,
+						onSourceSinkIntersection);
 				afterTouch.forEach((node, newColor) -> {
 					ColoredObject prev = colors.get(node);
 					if (prev == null || !prev.equals(newColor)) {
@@ -220,7 +221,9 @@ public class GraphColorer {
 				final @NonNull ColoredObject[] results = Arrays.stream(invocation.getResults()).map(colors::get)
 						.toArray(ColoredObject[]::new);
 
-				invocationCallback.onInvokation(invocation, args, results).forEach((node, newColor) -> {
+				final @NonNull Map<DataNode, ColoredObject> onInvokation = invocationCallback.onInvokation(invocation,
+						args, results);
+				onInvokation.forEach((node, newColor) -> {
 					ColoredObject prev = colors.get(node);
 					if (prev == null || !prev.equals(newColor)) {
 						newColors.put(node, newColor);
