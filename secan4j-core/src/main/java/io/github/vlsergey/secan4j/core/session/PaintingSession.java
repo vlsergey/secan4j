@@ -1,6 +1,7 @@
 package io.github.vlsergey.secan4j.core.session;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.unmodifiableSet;
 
 import java.util.Arrays;
@@ -23,6 +24,7 @@ import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colored.GraphColorer;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colored.brushes.ColorPaintBrush;
+import io.github.vlsergey.secan4j.core.colored.brushes.CompositionNodeBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.CopierBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.ParentAttributesDefinerBrush;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
@@ -74,14 +76,19 @@ public class PaintingSession {
 		this.classPool = classPool;
 		this.dataProvider = new DataProvider();
 
-		final List<ColorPaintBrush> brushes = Arrays.asList(new CopierBrush(dataProvider),
+		final List<ColorPaintBrush> brushes = Arrays.asList(new CompositionNodeBrush(), new CopierBrush(dataProvider),
 				new ParentAttributesDefinerBrush(dataProvider));
 		this.graphColorer = new GraphColorer(brushes, classPool, new ColorlessGraphBuilder(),
 				new UserToCommandInjectionColorer(dataProvider), dataProvider);
 	}
 
 	public @Nullable ColoredObject[][] analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
-		PaintingTask paintingTask = new PaintingTask(ctMethod, null, null);
+		return analyze(ctMethod, null, null);
+	}
+
+	public @Nullable ColoredObject[][] analyze(CtBehavior ctMethod, ColoredObject ins[], ColoredObject outs[])
+			throws ExecutionException, InterruptedException {
+		PaintingTask paintingTask = new PaintingTask(ctMethod, ins, outs);
 		queueImpl(paintingTask, QueueReason.ANALYZE_REQUEST);
 
 		this.executorService.waitForAllTasksToComplete();
@@ -108,7 +115,8 @@ public class PaintingSession {
 					onSourceSinkIntersection);
 
 			final Set<PaintingTask> oldDependencies = task.getDependencies();
-			task.setDependencies(unmodifiableSet(new HashSet<>(newDependencies)));
+			task.setDependencies(
+					newDependencies.isEmpty() ? emptySet() : unmodifiableSet(new HashSet<>(newDependencies)));
 
 			/*
 			 * update links from dependencies to task so it won't be updated on old
@@ -171,8 +179,9 @@ public class PaintingSession {
 
 		try {
 			if (log.isDebugEnabled()) {
-				log.debug("Going deeper from {}(…) by analyzing {}.{}(…) call with args {}", prevTask.getMethodName(),
-						invocation.getClassName(), invocation.getMethodName(), ins);
+				log.debug("Going deeper from {}(…) by analyzing {}.{}( {} ) call with args {}",
+						prevTask.getMethodName(), invocation.getClassName(), invocation.getMethodName(),
+						invocation.getMethodSignature(), ins);
 			}
 
 			CtClass invClass = classPool.get(invocation.getClassName());

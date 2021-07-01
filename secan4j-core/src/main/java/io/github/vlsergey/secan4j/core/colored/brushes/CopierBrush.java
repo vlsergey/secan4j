@@ -8,11 +8,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import io.github.vlsergey.secan4j.annotations.CopyAttributesFrom;
 import io.github.vlsergey.secan4j.annotations.CopyAttributesTo;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
+import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
@@ -31,7 +33,8 @@ public class CopierBrush implements ColorPaintBrush {
 
 	@Override
 	public @NonNull Map<DataNode, ColoredObject> doTouch(@NonNull BlockDataGraph colorlessGraph,
-			@NonNull Map<DataNode, ColoredObject> oldColors) {
+			@NonNull Map<DataNode, ColoredObject> oldColors,
+			BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 		if (oldColors.isEmpty()) {
 			return emptyMap();
 		}
@@ -39,6 +42,11 @@ public class CopierBrush implements ColorPaintBrush {
 		Map<DataNode, ColoredObject> newColors = new HashMap<>();
 
 		for (Invocation invocation : colorlessGraph.getInvokations()) {
+			if (invocation.getClassName() == null || invocation.getMethodName() == null
+					|| invocation.getMethodSignature() == null) {
+				continue;
+			}
+
 			final Set<Class<?>> forMethodResult = dataProvider.getForMethodResult(invocation.getClassName(),
 					invocation.getClassName(), invocation.getMethodSignature());
 			final Set<Class<?>>[] forMethodArguments = dataProvider.getForMethodArguments(invocation.getClassName(),
