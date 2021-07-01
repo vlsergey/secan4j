@@ -1,5 +1,6 @@
 package io.github.vlsergey.secan4j.core.session;
 
+import static io.github.vlsergey.secan4j.core.colored.ColorType.SourceData;
 import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -27,7 +28,7 @@ import javassist.Modifier;
 import javassist.NotFoundException;
 import lombok.NonNull;
 
-public class ConcatenationPartsTest {
+class ConcatenationPartsTest {
 
 	private final static @NonNull BiConsumer<TraceItem, TraceItem> noIntersectionExpected = (source, sink) -> {
 		fail("We din't expect intersection to be found here");
@@ -116,19 +117,32 @@ public class ConcatenationPartsTest {
 	}
 
 	@Test
+	void testStringBuilderAppendObject() throws Exception {
+		assertArrayEquals(new ColorType[][] { { SourceData, SourceData }, { SourceData } },
+				analyze(StringBuilder.class, "append", "(Ljava/lang/Object;)Ljava/lang/StringBuilder;",
+						new ColorType[] { null, SourceData }, new ColorType[] { null },
+						new Class[] { null, String.class }));
+	}
+
+	@Test
+	void testStringBuilderAppendString() throws Exception {
+		assertArrayEquals(new ColorType[][] { { SourceData, SourceData }, { SourceData } },
+				analyze(StringBuilder.class, "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+						new ColorType[] { null, SourceData }, new ColorType[] { null }));
+	}
+
+	@Test
 	void testStringInit() throws Exception {
-		assertArrayEquals(new ColorType[][] { { ColorType.SourceData, ColorType.SourceData }, {} },
-				analyze(String.class, "<init>", "(Ljava/lang/String;)V", new ColorType[] { null, ColorType.SourceData },
-						new ColorType[] {}));
+		assertArrayEquals(new ColorType[][] { { SourceData, SourceData }, {} }, analyze(String.class, "<init>",
+				"(Ljava/lang/String;)V", new ColorType[] { null, SourceData }, new ColorType[] {}));
 	}
 
 	@Test
 	void testStringValueOf() throws Exception {
 		// transfer color from argument to <this>
-		assertArrayEquals(new ColorType[][] { { ColorType.SourceData }, { ColorType.SourceData } },
+		assertArrayEquals(new ColorType[][] { { SourceData }, { SourceData } },
 				analyze(String.class, "valueOf", "(Ljava/lang/Object;)Ljava/lang/String;",
-						new ColorType[] { ColorType.SourceData }, new ColorType[] { null },
-						new Class[] { String.class }));
+						new ColorType[] { SourceData }, new ColorType[] { null }, new Class[] { String.class }));
 	}
 
 }
