@@ -13,14 +13,13 @@ import io.github.vlsergey.secan4j.core.colored.ColoredObject;
 import io.github.vlsergey.secan4j.core.colored.Confidence;
 import io.github.vlsergey.secan4j.core.colored.SimpleColoredMethods;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
-import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.NotFoundException;
 import javassist.bytecode.analysis.Type;
 import lombok.NonNull;
 
-class PaintingTaskTest {
+class PaintingTaskTest extends BasePaintingSessionTest {
 
 	private final static class TestTraceItem implements TraceItem {
 		@Override
@@ -33,8 +32,6 @@ class PaintingTaskTest {
 			return null;
 		}
 	}
-
-	private final ClassPool classPool = ClassPool.getDefault();
 
 	@Test
 	void testThatDemultiplexingWillNotCreateNewItemsIndefinitly() throws NotFoundException {
