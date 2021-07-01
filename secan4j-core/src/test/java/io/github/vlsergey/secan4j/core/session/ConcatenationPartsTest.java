@@ -1,4 +1,4 @@
-package io.github.vlsergey.secan4j.core.colored;
+package io.github.vlsergey.secan4j.core.session;
 
 import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -14,7 +14,11 @@ import javax.annotation.Nullable;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.vlsergey.secan4j.core.session.PaintingSession;
+import io.github.vlsergey.secan4j.core.colored.ColorType;
+import io.github.vlsergey.secan4j.core.colored.ColoredObject;
+import io.github.vlsergey.secan4j.core.colored.Confidence;
+import io.github.vlsergey.secan4j.core.colored.PaintedColor;
+import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
