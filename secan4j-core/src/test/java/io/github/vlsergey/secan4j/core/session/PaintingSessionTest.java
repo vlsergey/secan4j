@@ -46,7 +46,7 @@ class PaintingSessionTest {
 
 		final ColoredObject[][] result = paintingSession.analyze(ctMethod);
 		assertNotNull(result);
-//		assertEquals(ColorType.SourceData, result[1][0].getColor().getType());
+		assertEquals(ColorType.SourceData, result[1][0].getColor().getType());
 	}
 
 }
