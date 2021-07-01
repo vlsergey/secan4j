@@ -27,7 +27,9 @@ import javassist.CtMethod;
 import javassist.Modifier;
 import javassist.NotFoundException;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 class ConcatenationPartsTest {
 
 	private final static @NonNull BiConsumer<TraceItem, TraceItem> noIntersectionExpected = (source, sink) -> {
@@ -81,8 +83,22 @@ class ConcatenationPartsTest {
 			final @NonNull String signature, ColorType[] ins, ColorType[] outs, @Nullable Class<?>[] inTypes)
 			throws Exception {
 		final CtClass ctClass = classPool.get(cls.getName());
-		final CtBehavior ctBehavior = "<init>".equals(methodName) ? ctClass.getConstructor(signature)
-				: ctClass.getMethod(methodName, signature);
+		final CtBehavior ctBehavior;
+		try {
+			ctBehavior = "<init>".equals(methodName) ? ctClass.getConstructor(signature)
+					: ctClass.getMethod(methodName, signature);
+		} catch (NotFoundException exc) {
+			if (methodName != "<init>") {
+				Arrays.stream(ctClass.getMethods()).filter(m -> m.getName().equals(methodName)).forEach(
+						m -> log.info("Found method with name {} and signature {}", methodName, m.getSignature()));
+				fail("no method '" + methodName + "' with signature '" + signature + "' found");
+			} else {
+				Arrays.stream(ctClass.getConstructors())
+						.forEach(c -> log.info("Found constructor with signature {}", methodName, c.getSignature()));
+				fail("no constructor '" + methodName + "' with signature '" + signature + "' found");
+			}
+			throw new AssertionError();
+		}
 
 		assert outs.length < 2;
 		assert (outs.length == 1) == (ctBehavior instanceof CtMethod
@@ -117,6 +133,12 @@ class ConcatenationPartsTest {
 	}
 
 	@Test
+	void testArraysCopyOfRange() throws Exception {
+		assertArrayEquals(new ColorType[][] { { SourceData, null, null }, { SourceData } }, analyze(Arrays.class,
+				"copyOfRange", "([CII)[C", new ColorType[] { SourceData, null, null }, new ColorType[] { null }));
+	}
+
+	@Test
 	void testStringBuilderAppendObject() throws Exception {
 		assertArrayEquals(new ColorType[][] { { SourceData, SourceData }, { SourceData } },
 				analyze(StringBuilder.class, "append", "(Ljava/lang/Object;)Ljava/lang/StringBuilder;",
@@ -129,6 +151,12 @@ class ConcatenationPartsTest {
 		assertArrayEquals(new ColorType[][] { { SourceData, SourceData }, { SourceData } },
 				analyze(StringBuilder.class, "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
 						new ColorType[] { null, SourceData }, new ColorType[] { null }));
+	}
+
+	@Test
+	void testStringBuilderToString() throws Exception {
+		assertArrayEquals(new ColorType[][] { { SourceData }, { SourceData } }, analyze(StringBuilder.class, "toString",
+				"()Ljava/lang/String;", new ColorType[] { SourceData }, new ColorType[] { null }));
 	}
 
 	@Test
