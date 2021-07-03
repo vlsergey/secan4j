@@ -28,6 +28,7 @@ import io.github.vlsergey.secan4j.core.colored.brushes.CompositionNodeBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.CopierBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.InvocationsBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.InvocationsImplicitColorer;
+import io.github.vlsergey.secan4j.core.colored.brushes.InvokeDynamicBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.MethodParameterImplicitColorer;
 import io.github.vlsergey.secan4j.core.colored.brushes.ParentAttributesDefinerBrush;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
@@ -98,7 +99,7 @@ public class PaintingSession {
 
 		final List<ColorPaintBrush> repeatableBrushes = Arrays.asList(new CompositionNodeBrush(),
 				new CopierBrush(dataProvider), new ParentAttributesDefinerBrush(dataProvider),
-				new InvocationsBrush(this));
+				new InvocationsBrush(this), new InvokeDynamicBrush());
 
 		this.graphColorer = new GraphColorer(initialBrushes, repeatableBrushes, new ColorlessGraphBuilder());
 	}

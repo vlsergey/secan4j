@@ -32,6 +32,8 @@ import javassist.bytecode.Descriptor;
 import javassist.bytecode.InstructionPrinter;
 import javassist.bytecode.Mnemonic;
 import javassist.bytecode.Opcode;
+import javassist.bytecode.SignatureAttribute;
+import javassist.bytecode.SignatureAttribute.MethodSignature;
 import javassist.bytecode.analysis.ControlFlow;
 import javassist.bytecode.analysis.ControlFlow.Block;
 import javassist.bytecode.analysis.ControlFlow.Node;
@@ -151,13 +153,13 @@ public class ColorlessGraphBuilder {
 	private static void processInstructionWithStackOnly(final @NonNull ConstPool constPool,
 			final @NonNull CodeIterator iterator, final int index, final @NonNull Deque<DataNode> currentStack,
 			final int toPoll, final @NonNull Supplier<Type> typeOfNextStackTop) {
-		processInstructionWithStackOnly(currentStack, toPoll, typeOfNextStackTop,
+		processInstructionWithStackOnly(currentStack, iterator.byteAt(index), toPoll, typeOfNextStackTop,
 				() -> new DataNode(InstructionPrinter.instructionString(iterator, index, constPool)));
 	}
 
-	private static void processInstructionWithStackOnly(final @NonNull Deque<DataNode> currentStack, final int toPoll,
-			final @NonNull Supplier<Type> typeOfNextStackTop, Supplier<DataNode> resultTypeSupplier) {
-		DataNode result = resultTypeSupplier.get().setType(typeOfNextStackTop.get());
+	private static void processInstructionWithStackOnly(final @NonNull Deque<DataNode> currentStack, final int op,
+			final int toPoll, final @NonNull Supplier<Type> typeOfNextStackTop, Supplier<DataNode> resultTypeSupplier) {
+		DataNode result = resultTypeSupplier.get().setOperation(op).setType(typeOfNextStackTop.get());
 		DataNode[] inputs = new DataNode[toPoll];
 		for (int i = 0; i < toPoll; i++) {
 			inputs[i] = currentStack.pop();
@@ -541,10 +543,10 @@ public class ColorlessGraphBuilder {
 
 			// XXX: USE HEAP
 			if (op == Opcode.GETFIELD) {
-				processInstructionWithStackOnly(currentStack, 1, typeOfNextStackTop,
+				processInstructionWithStackOnly(currentStack, op, 1, typeOfNextStackTop,
 						() -> new GetFieldNode(fieldClass, ctField));
 			} else {
-				processInstructionWithStackOnly(currentStack, 0, typeOfNextStackTop,
+				processInstructionWithStackOnly(currentStack, op, 0, typeOfNextStackTop,
 						() -> new GetStaticNode(fieldClass, ctField));
 			}
 			break;
@@ -633,7 +635,18 @@ public class ColorlessGraphBuilder {
 			break;
 		}
 
-		case Opcode.INVOKEDYNAMIC:
+		case Opcode.INVOKEDYNAMIC: {
+			int constantIndex = iterator.u16bitAt(index + 1);
+
+			final int nameAndType = constPool.getInvokeDynamicNameAndType(constantIndex);
+			final String signature = constPool.getUtf8Info(constPool.getNameAndTypeDescriptor(nameAndType));
+
+			final MethodSignature methodSignature = SignatureAttribute.toMethodSignature(signature);
+			processInstructionWithStackOnly(constPool, iterator, index, currentStack,
+					methodSignature.getParameterTypes().length, typeOfNextStackTop);
+			break;
+		}
+
 		case Opcode.INVOKEINTERFACE:
 		case Opcode.INVOKESPECIAL:
 		case Opcode.INVOKESTATIC:
@@ -664,7 +677,7 @@ public class ColorlessGraphBuilder {
 			CtClass retType = Descriptor.getReturnType(signature, classPool);
 
 			List<DataNode> inputs = new ArrayList<>();
-			if (op != Opcode.INVOKESTATIC && op != Opcode.INVOKEDYNAMIC) {
+			if (op != Opcode.INVOKESTATIC) {
 				// objectref
 				inputs.add(currentStack.pop());
 			}
@@ -684,8 +697,7 @@ public class ColorlessGraphBuilder {
 			}
 
 			invokations.add(new Invocation(className, methodName, signature, inputsArray,
-					result == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { result },
-					op == Opcode.INVOKESTATIC || op == Opcode.INVOKEDYNAMIC));
+					result == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { result }, op == Opcode.INVOKESTATIC));
 			break;
 		}
 
