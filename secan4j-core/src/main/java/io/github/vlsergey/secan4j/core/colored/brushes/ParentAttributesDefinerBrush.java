@@ -1,15 +1,11 @@
 package io.github.vlsergey.secan4j.core.colored.brushes;
 
-import static java.util.Collections.emptyMap;
-
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
 import io.github.vlsergey.secan4j.annotations.ParentAttributesDefiner;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
-import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.GetFieldNode;
@@ -27,13 +23,9 @@ public class ParentAttributesDefinerBrush implements ColorPaintBrush {
 	private final @NonNull DataProvider dataProvider;
 
 	@Override
-	public @NonNull Map<DataNode, ColoredObject> doTouch(@NonNull BlockDataGraph colorlessGraph,
-			@NonNull Map<DataNode, ColoredObject> oldColors, BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
-		if (oldColors.isEmpty()) {
-			return emptyMap();
-		}
-
-		Map<DataNode, ColoredObject> newColors = new HashMap<>();
+	public void doTouch(final @NonNull BlockDataGraph colorlessGraph,
+			final @NonNull Map<DataNode, ColoredObject> oldColors,
+			final @NonNull BiConsumer<DataNode, ColoredObject> onTouch) {
 
 		BrushUtils.getAllNodesWithType(colorlessGraph, GetFieldNode.class).forEach(getField -> {
 
@@ -44,12 +36,12 @@ public class ParentAttributesDefinerBrush implements ColorPaintBrush {
 				BrushUtils.copyColor(
 						oldColors, getField, color -> ColoredObject
 								.forRootOnly(getField.getObjectRef().getType().getCtClass(), color.getColor()),
-						getField.getObjectRef(), newColors);
+						getField.getObjectRef(), onTouch);
 			}
 
 			BrushUtils.copyColor(oldColors, getField.getObjectRef(),
 					color -> ColoredObject.forRootOnly(getField.getType().getCtClass(), color.getColor()), getField,
-					newColors);
+					onTouch);
 
 		});
 
@@ -61,16 +53,14 @@ public class ParentAttributesDefinerBrush implements ColorPaintBrush {
 				BrushUtils.copyColor(
 						oldColors, putFieldNode.getValue(), color -> ColoredObject
 								.forRootOnly(putFieldNode.getObjectRef().getType().getCtClass(), color.getColor()),
-						putFieldNode.getObjectRef(), newColors);
+						putFieldNode.getObjectRef(), onTouch);
 
 				BrushUtils.copyColor(
 						oldColors, putFieldNode.getObjectRef(), color -> ColoredObject
 								.forRootOnly(putFieldNode.getValue().getType().getCtClass(), color.getColor()),
-						putFieldNode.getValue(), newColors);
+						putFieldNode.getValue(), onTouch);
 			}
 		}
-
-		return newColors;
 	}
 
 }

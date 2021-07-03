@@ -2,6 +2,7 @@ package io.github.vlsergey.secan4j.core.colored.brushes;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -21,18 +22,18 @@ class BrushUtils {
 
 	static void copyColor(final @NonNull Map<DataNode, ColoredObject> oldColors, final @NonNull DataNode source,
 			final @NonNull Function<ColoredObject, ColoredObject> colorTransformation, final @NonNull DataNode target,
-			final @NonNull Map<DataNode, ColoredObject> newColors) {
+			final @NonNull BiConsumer<DataNode, ColoredObject> onTouch) {
 		final ColoredObject sourceColor = oldColors.get(source);
 		if (sourceColor == null) {
 			return;
 		}
-		final ColoredObject transformed = colorTransformation.apply(sourceColor);
 
 		final ColoredObject oldTargetColor = oldColors.get(target);
-		final ColoredObject newTargetColor = ColoredObject.merge(oldTargetColor, transformed, null);
+		final ColoredObject newTargetColor = colorTransformation.apply(sourceColor);
+
 		if (!newTargetColor.equals(oldTargetColor)) {
-			newColors.put(target, newTargetColor);
-			log.debug("Color {} copied from {} to {} as {}", sourceColor, source, target, newTargetColor);
+			log.debug("Copying color {} from {} to {} as {}", sourceColor, source, target, newTargetColor);
+			onTouch.accept(target, newTargetColor);
 		}
 	}
 

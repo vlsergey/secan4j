@@ -26,6 +26,9 @@ import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colored.brushes.ColorPaintBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.CompositionNodeBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.CopierBrush;
+import io.github.vlsergey.secan4j.core.colored.brushes.InvocationsBrush;
+import io.github.vlsergey.secan4j.core.colored.brushes.InvocationsImplicitColorer;
+import io.github.vlsergey.secan4j.core.colored.brushes.MethodParameterImplicitColorer;
 import io.github.vlsergey.secan4j.core.colored.brushes.ParentAttributesDefinerBrush;
 import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
@@ -36,13 +39,22 @@ import io.github.vlsergey.secan4j.data.DataProvider;
 import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
 @Data
 @Slf4j
 public class PaintingSession {
+
+	@AllArgsConstructor
+	@Getter
+	private static class CurrentTaskInfo {
+		private final PaintingTask currentTask;
+		private final Set<PaintingTask> newDependencies = new HashSet<PaintingTask>(0);
+	}
 
 	private static <T> boolean hasNonNull(@NonNull T[] array) {
 		for (T item : array) {
@@ -58,6 +70,8 @@ public class PaintingSession {
 	private final @NonNull ClassPool classPool;
 
 	private final @NonNull AtomicLong currentHeapVersion = new AtomicLong(0);
+
+	private final ThreadLocal<CurrentTaskInfo> currentTaskHolder = new ThreadLocal<>();
 
 	private final @NonNull DataProvider dataProvider;
 
@@ -76,10 +90,17 @@ public class PaintingSession {
 		this.classPool = classPool;
 		this.dataProvider = new DataProvider();
 
-		final List<ColorPaintBrush> brushes = Arrays.asList(new CompositionNodeBrush(), new CopierBrush(dataProvider),
-				new ParentAttributesDefinerBrush(dataProvider));
-		this.graphColorer = new GraphColorer(brushes, classPool, new ColorlessGraphBuilder(),
-				new UserToCommandInjectionColorer(dataProvider), dataProvider);
+		final UserToCommandInjectionColorer colorProvider = new UserToCommandInjectionColorer(dataProvider);
+
+		final List<ColorPaintBrush> initialBrushes = Arrays.asList(
+				new InvocationsImplicitColorer(classPool, colorProvider),
+				new MethodParameterImplicitColorer(colorProvider));
+
+		final List<ColorPaintBrush> repeatableBrushes = Arrays.asList(new CompositionNodeBrush(),
+				new CopierBrush(dataProvider), new ParentAttributesDefinerBrush(dataProvider),
+				new InvocationsBrush(this));
+
+		this.graphColorer = new GraphColorer(initialBrushes, repeatableBrushes, new ColorlessGraphBuilder());
 	}
 
 	public @Nullable ColoredObject[][] analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {
@@ -98,6 +119,9 @@ public class PaintingSession {
 	}
 
 	protected @NonNull void executeTask(final @NonNull PaintingTask task) {
+		assert currentTaskHolder.get() == null : "executeTask() is not allowed to be called recursively";
+		currentTaskHolder.set(new CurrentTaskInfo(task));
+
 		try {
 			final @NonNull CtBehavior method = task.getMethod(classPool);
 
@@ -108,11 +132,10 @@ public class PaintingSession {
 			final @NonNull CtClass ctClass = method.getDeclaringClass();
 
 			final long usedHeapVersion = currentHeapVersion.get();
-			final Set<PaintingTask> newDependencies = new HashSet<>();
 			Optional<ColoredObject[][]> opUpdated = graphColorer.color(ctClass, method, task.getParamIns(),
-					task.getParamOuts(),
-					(subInvokation, ins, outs) -> getOrQueueSubcall(subInvokation, ins, outs, task, newDependencies),
-					onSourceSinkIntersection);
+					task.getParamOuts(), onSourceSinkIntersection);
+
+			final Set<PaintingTask> newDependencies = currentTaskHolder.get().getNewDependencies();
 
 			final Set<PaintingTask> oldDependencies = task.getDependencies();
 			task.setDependencies(
@@ -168,20 +191,25 @@ public class PaintingSession {
 		} catch (Exception exc) {
 			log.error("Unable to execute colorizing task for " + task.getMethodName() + ": " + exc.getMessage(), exc);
 			// no, we don't requeue after error
+		} finally {
+			currentTaskHolder.remove();
 		}
 	}
 
-	private @NonNull Map<DataNode, ColoredObject> getOrQueueSubcall(final @NonNull Invocation invocation,
-			final @NonNull ColoredObject[] ins, final @NonNull ColoredObject[] outs, PaintingTask prevTask,
-			final @NonNull Set<PaintingTask> newDependencies) {
+	public @NonNull Map<DataNode, ColoredObject> getOrQueueSubcall(final @NonNull Invocation invocation,
+			final @NonNull ColoredObject[] ins, final @NonNull ColoredObject[] outs) {
 		assert ins.length == invocation.getParameters().length;
 		assert outs.length == invocation.getResults().length;
+
+		final CurrentTaskInfo currentTaskInfo = currentTaskHolder.get();
+		assert currentTaskInfo != null : "No current task in progress in current thread. "
+				+ "This method need to be called only from thread that executes executeTask() method.";
 
 		try {
 			if (log.isDebugEnabled()) {
 				log.debug("Going deeper from {}(…) by analyzing {}.{}( {} ) call with args {}",
-						prevTask.getMethodName(), invocation.getClassName(), invocation.getMethodName(),
-						invocation.getMethodSignature(), ins);
+						currentTaskInfo.getCurrentTask().getMethodName(), invocation.getClassName(),
+						invocation.getMethodName(), invocation.getMethodSignature(), ins);
 			}
 
 			CtClass invClass = classPool.get(invocation.getClassName());
@@ -215,15 +243,15 @@ public class PaintingSession {
 
 				final PaintingTask subCallTask = allNodes
 						.computeIfAbsent(new PaintingTask.TaskKey(invMethod, singleClassIns, outs), PaintingTask::new);
-				newDependencies.add(subCallTask);
+				currentTaskInfo.getNewDependencies().add(subCallTask);
 
 				final Result cached = subCallTask.getResult();
 				if (cached != null) {
 					for (int i = 0; i < ins.length; i++) {
-						updatedIns[i] = ColoredObject.merge(updatedIns[i], cached.getResultIns()[i], null);
+						updatedIns[i] = ColoredObject.mergeToMostDangerous(updatedIns[i], cached.getResultIns()[i]);
 					}
 					for (int i = 0; i < outs.length; i++) {
-						updatedOuts[i] = ColoredObject.merge(updatedOuts[i], cached.getResultOuts()[i], null);
+						updatedOuts[i] = ColoredObject.mergeToMostDangerous(updatedOuts[i], cached.getResultOuts()[i]);
 					}
 				}
 			});

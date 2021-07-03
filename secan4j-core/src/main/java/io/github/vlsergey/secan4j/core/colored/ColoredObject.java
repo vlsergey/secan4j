@@ -57,7 +57,7 @@ public class ColoredObject {
 	}
 
 	public static @NonNull ColoredObject merge(final @Nullable ColoredObject picA, final @Nullable ColoredObject picB,
-			BiConsumer<PaintedColor, PaintedColor> problemReporter) {
+			final @NonNull BiConsumer<PaintedColor, PaintedColor> problemReporter) {
 
 		return mergeImpl(picA, picB, (a, b) -> {
 			if (a.type != b.type) {
@@ -65,6 +65,32 @@ public class ColoredObject {
 					problemReporter.accept(a, b);
 				}
 				return MIX_OF_COLORS;
+			}
+			return a.confidence.getValue() >= b.confidence.getValue() ? a : b;
+		});
+	}
+
+	/**
+	 * Merge colors in a way that the most dangerous is preserved
+	 */
+	public static @NonNull ColoredObject mergeToMostDangerous(final @Nullable ColoredObject picA,
+			final @Nullable ColoredObject picB) {
+
+		return mergeImpl(picA, picB, (a, b) -> {
+			if (a.type != b.type) {
+				if (a.type == ColorType.SourceData) {
+					return a;
+				} else if (b.type == ColorType.SourceData) {
+					return b;
+				}
+
+				if (a.type == ColorType.Intersection) {
+					return a;
+				} else if (b.type == ColorType.Intersection) {
+					return b;
+				}
+
+				throw new AssertionError("Both types are SinkData, but they are not equal (?)");
 			}
 			return a.confidence.getValue() >= b.confidence.getValue() ? a : b;
 		});

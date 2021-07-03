@@ -22,4 +22,10 @@ class SimpleColoredMethodsTest extends BasePaintingSessionTest {
 				analyze(SimpleColoredMethods.class, "concatenation"));
 	}
 
+	@Test
+	void testPrepareStatement() throws Exception {
+		assertArrayEquals(new ColorType[][] { { null, null, SourceData }, { null } },
+				analyze(SimpleColoredMethods.class, "prepareStatement"));
+	}
+
 }

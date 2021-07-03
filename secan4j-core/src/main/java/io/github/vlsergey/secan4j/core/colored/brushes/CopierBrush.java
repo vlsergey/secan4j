@@ -1,10 +1,7 @@
 package io.github.vlsergey.secan4j.core.colored.brushes;
 
-import static java.util.Collections.emptyMap;
-
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,7 +11,6 @@ import java.util.function.Function;
 import io.github.vlsergey.secan4j.annotations.CopyAttributesFrom;
 import io.github.vlsergey.secan4j.annotations.CopyAttributesTo;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
-import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
@@ -32,15 +28,8 @@ public class CopierBrush implements ColorPaintBrush {
 	private final @NonNull DataProvider dataProvider;
 
 	@Override
-	public @NonNull Map<DataNode, ColoredObject> doTouch(@NonNull BlockDataGraph colorlessGraph,
-			@NonNull Map<DataNode, ColoredObject> oldColors,
-			BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
-		if (oldColors.isEmpty()) {
-			return emptyMap();
-		}
-
-		Map<DataNode, ColoredObject> newColors = new HashMap<>();
-
+	public @NonNull void doTouch(@NonNull BlockDataGraph colorlessGraph,
+			@NonNull Map<DataNode, ColoredObject> oldColors, BiConsumer<DataNode, ColoredObject> onTouch) {
 		for (Invocation invocation : colorlessGraph.getInvokations()) {
 			if (invocation.getClassName() == null || invocation.getMethodName() == null
 					|| invocation.getMethodSignature() == null) {
@@ -79,12 +68,9 @@ public class CopierBrush implements ColorPaintBrush {
 				assert sources.size() == 1 : "sources.size() != 1 (NYI)";
 				assert targets.size() == 1 : "targets.size() != 1 (NYI)";
 
-				BrushUtils.copyColor(oldColors, sources.get(0), Function.identity(), targets.get(0), newColors);
+				BrushUtils.copyColor(oldColors, sources.get(0), Function.identity(), targets.get(0), onTouch);
 			}
 		}
-
-		return newColors;
-
 	}
 
 }
