@@ -17,7 +17,7 @@ import lombok.NonNull;
  */
 @Data
 @NotThreadSafe
-public class ColorApplier implements BiConsumer<@NonNull DataNode, @Nullable ColoredObject> {
+public class ColorApplier implements BiConsumer<DataNode, ColoredObject> {
 
 	private final @NonNull Map<DataNode, ColoredObject> newColors = new HashMap<>(1);
 	private final @NonNull Map<DataNode, ColoredObject> oldColors;
