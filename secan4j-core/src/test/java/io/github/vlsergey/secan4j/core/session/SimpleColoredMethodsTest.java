@@ -1,7 +1,9 @@
 package io.github.vlsergey.secan4j.core.session;
 
+import static io.github.vlsergey.secan4j.core.colored.ColorType.Intersection;
 import static io.github.vlsergey.secan4j.core.colored.ColorType.SourceData;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,8 +26,10 @@ class SimpleColoredMethodsTest extends BasePaintingSessionTest {
 
 	@Test
 	void testPrepareStatement() throws Exception {
-		assertArrayEquals(new ColorType[][] { { null, null, SourceData }, { null } },
+		assertArrayEquals(new ColorType[][] { { null, null, Intersection }, { null } },
 				analyze(SimpleColoredMethods.class, "prepareStatement"));
+
+		assertEquals(1, this.getIntersections().size());
 	}
 
 }
