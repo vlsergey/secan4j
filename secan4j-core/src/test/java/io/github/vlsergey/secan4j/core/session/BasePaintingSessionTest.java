@@ -3,13 +3,19 @@ package io.github.vlsergey.secan4j.core.session;
 import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
 import javax.annotation.Nullable;
+
+import org.junit.jupiter.api.BeforeEach;
 
 import io.github.vlsergey.secan4j.core.colored.ColorType;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
@@ -22,16 +28,13 @@ import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.Modifier;
 import javassist.NotFoundException;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 class BasePaintingSessionTest {
-
-	@NonNull
-	protected static final BiConsumer<TraceItem, TraceItem> noIntersectionExpected = (source, sink) -> {
-		fail("We din't expect intersection to be found here");
-	};
 
 	protected static final TraceItem testTraceItem = new TraceItem() {
 
@@ -71,7 +74,8 @@ class BasePaintingSessionTest {
 	}
 
 	protected static <S, R> R[] map(S[] src, Function<S, R> func, IntFunction<R[]> arraySupplier) {
-		return Arrays.stream(src).map(x -> x == null ? null : func.apply(x)).toArray(arraySupplier);
+		return src == null ? null
+				: Arrays.stream(src).map(x -> x == null ? null : func.apply(x)).toArray(arraySupplier);
 	}
 
 	protected static @Nullable ColoredObject[] toColoredObjects(final CtClass[] classes,
@@ -99,22 +103,30 @@ class BasePaintingSessionTest {
 
 	protected final ClassPool classPool = ClassPool.getDefault();
 
+	@Getter(AccessLevel.PROTECTED)
+	private List<Entry<TraceItem, TraceItem>> intersections;
+
+	@NonNull
+	protected final BiConsumer<TraceItem, TraceItem> onIntersection = (source, sink) -> {
+		this.intersections.add(new SimpleEntry<>(source, sink));
+	};
+
 	@NonNull
 	protected ColorType[][] analyze(final @NonNull Class<?> cls, final @NonNull String methodName) throws Exception {
-		return analyze(cls, methodName, null, null, null, null, noIntersectionExpected);
+		return analyze(cls, methodName, null, null, null, null, onIntersection);
 	}
 
 	@NonNull
 	protected ColorType[][] analyze(final @NonNull Class<?> cls, final @NonNull String methodName,
 			final @Nullable String signature, ColorType[] ins, ColorType[] outs) throws Exception {
-		return analyze(cls, methodName, signature, ins, outs, null, noIntersectionExpected);
+		return analyze(cls, methodName, signature, ins, outs, null, onIntersection);
 	}
 
 	@NonNull
 	protected ColorType[][] analyze(final @NonNull Class<?> cls, final @NonNull String methodName,
 			final @Nullable String signature, @Nullable ColorType[] ins, @Nullable ColorType[] outs,
 			@Nullable Class<?>[] inTypes) throws Exception {
-		return analyze(cls, methodName, signature, ins, outs, inTypes, noIntersectionExpected);
+		return analyze(cls, methodName, signature, ins, outs, inTypes, onIntersection);
 	}
 
 	@NonNull
@@ -132,7 +144,7 @@ class BasePaintingSessionTest {
 		}
 
 		PaintingSession paintingSession = new PaintingSession(classPool,
-				onSourceSinkIntersection == null ? noIntersectionExpected : onSourceSinkIntersection);
+				onSourceSinkIntersection == null ? onIntersection : onSourceSinkIntersection);
 
 		final CtClass[] actualInTypes;
 		if (!(ctBehavior instanceof CtMethod) || !Modifier.isStatic(((CtMethod) ctBehavior).getModifiers())) {
@@ -157,9 +169,12 @@ class BasePaintingSessionTest {
 						: outs.length == 0 ? new ColoredObject[0]
 								: toColoredObjects(new CtClass[] { ((CtMethod) ctBehavior).getReturnType() }, outs));
 
-		final ColoredObject[][] result = analyzeResult != null ? analyzeResult
-				: new ColoredObject[][] { new ColoredObject[ins.length], new ColoredObject[outs.length] };
-		return toColorType(result);
+		return toColorType(analyzeResult);
+	}
+
+	@BeforeEach
+	void clearIntesections() {
+		this.intersections = new ArrayList<>();
 	}
 
 }

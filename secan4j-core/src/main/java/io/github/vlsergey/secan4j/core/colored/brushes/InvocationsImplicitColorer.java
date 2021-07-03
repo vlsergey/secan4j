@@ -51,10 +51,12 @@ public class InvocationsImplicitColorer implements ColorPaintBrush {
 
 				boolean thisAsDataNode = !invocation.isStaticCall();
 
-				for (int i = thisAsDataNode ? 1 : 0; i < invTargetMethod.getParameterTypes().length; i++) {
-					final DataNode dataNode = invocation.getParameters()[i];
+				for (int parameterIndex = 0; parameterIndex < invTargetMethod
+						.getParameterTypes().length; parameterIndex++) {
+					final int dataNodeIndex = (thisAsDataNode ? 1 : 0) + parameterIndex;
+					final DataNode dataNode = invocation.getParameters()[dataNodeIndex];
 					final @NonNull Optional<ColoredObject> opColor = colorProvider.getImplicitColor(invTargetClass,
-							invTargetMethod, i - (thisAsDataNode ? 1 : 0));
+							invTargetMethod, parameterIndex);
 
 					opColor.ifPresent(color -> {
 						if (log.isDebugEnabled()) {
