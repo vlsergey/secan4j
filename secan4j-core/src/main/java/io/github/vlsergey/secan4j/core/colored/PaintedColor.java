@@ -7,7 +7,7 @@ import lombok.NonNull;
 @AllArgsConstructor
 @Data
 public final class PaintedColor {
-	final Confidence confidence;
+	private final @NonNull Confidence confidence;
 	private final TraceItem src;
-	final @NonNull ColorType type;
+	private final @NonNull ColorType type;
 }

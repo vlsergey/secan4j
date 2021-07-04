@@ -25,8 +25,6 @@ import lombok.With;
 @Data
 public class ColoredObject {
 
-	private static final PaintedColor MIX_OF_COLORS = new PaintedColor(null, null, ColorType.Intersection);
-
 	private static void demultiplex(final @NonNull ColoredObject[] src, final @NonNull ColoredObject[] buffer,
 			int pointer, final @NonNull Consumer<@NonNull ColoredObject[]> consumer) {
 		if (pointer == src.length) {
@@ -60,13 +58,17 @@ public class ColoredObject {
 			final @NonNull BiConsumer<PaintedColor, PaintedColor> problemReporter) {
 
 		return mergeImpl(picA, picB, (a, b) -> {
-			if (a.type != b.type) {
-				if (a.type != ColorType.Intersection && b.type != ColorType.Intersection) {
-					problemReporter.accept(a, b);
-				}
-				return MIX_OF_COLORS;
+			if (a.getType() != b.getType()) {
+				if (a.getType() == ColorType.Intersection)
+					return a;
+				if (b.getType() == ColorType.Intersection)
+					return a;
+
+				problemReporter.accept(a, b);
+				return new PaintedColor(Confidence.min(a.getConfidence(), b.getConfidence()), null,
+						ColorType.Intersection);
 			}
-			return a.confidence.getValue() >= b.confidence.getValue() ? a : b;
+			return a.getConfidence().getValue() >= b.getConfidence().getValue() ? a : b;
 		});
 	}
 
@@ -77,22 +79,22 @@ public class ColoredObject {
 			final @Nullable ColoredObject picB) {
 
 		return mergeImpl(picA, picB, (a, b) -> {
-			if (a.type != b.type) {
-				if (a.type == ColorType.SourceData) {
+			if (a.getType() != b.getType()) {
+				if (a.getType() == ColorType.SourceData) {
 					return a;
-				} else if (b.type == ColorType.SourceData) {
+				} else if (b.getType() == ColorType.SourceData) {
 					return b;
 				}
 
-				if (a.type == ColorType.Intersection) {
+				if (a.getType() == ColorType.Intersection) {
 					return a;
-				} else if (b.type == ColorType.Intersection) {
+				} else if (b.getType() == ColorType.Intersection) {
 					return b;
 				}
 
 				throw new AssertionError("Both types are SinkData, but they are not equal (?)");
 			}
-			return a.confidence.getValue() >= b.confidence.getValue() ? a : b;
+			return a.getConfidence().getValue() >= b.getConfidence().getValue() ? a : b;
 		});
 	}
 
