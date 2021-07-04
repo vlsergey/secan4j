@@ -1,6 +1,7 @@
 package io.github.vlsergey.secan4j.core.colored;
 
 import lombok.Getter;
+import lombok.NonNull;
 
 public enum Confidence {
 
@@ -33,7 +34,7 @@ public enum Confidence {
 		return a.value >= b.value ? a : b;
 	}
 
-	public static Confidence min(Confidence a, Confidence b) {
+	public static @NonNull Confidence min(final @NonNull Confidence a, final @NonNull Confidence b) {
 		return a.value <= b.value ? a : b;
 	}
 }
