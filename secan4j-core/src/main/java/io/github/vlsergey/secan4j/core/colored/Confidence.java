@@ -24,6 +24,10 @@ public enum Confidence {
 		this.value = value;
 	}
 
+	public Confidence max(Confidence other) {
+		return max(this, other);
+	}
+
 	public static Confidence max(Confidence a, Confidence b) {
 		if (a == null) {
 			return b;

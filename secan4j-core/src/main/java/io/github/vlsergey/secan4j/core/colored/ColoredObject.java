@@ -6,6 +6,7 @@ import static java.util.Collections.singleton;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -65,8 +66,8 @@ public class ColoredObject {
 					return a;
 
 				problemReporter.accept(a, b);
-				return new PaintedColor(Confidence.min(a.getConfidence(), b.getConfidence()), null,
-						ColorType.Intersection);
+				return new PaintedColor(Confidence.min(a.getConfidence(), b.getConfidence()).max(Confidence.CALCULATED),
+						null, ColorType.Intersection);
 			}
 			return a.getConfidence().getValue() >= b.getConfidence().getValue() ? a : b;
 		});
@@ -101,11 +102,11 @@ public class ColoredObject {
 	private static @Nullable ColoredObject mergeImpl(final @Nullable ColoredObject picA,
 			final @Nullable ColoredObject picB,
 			final @NonNull BiFunction<PaintedColor, PaintedColor, PaintedColor> colorMerged) {
-		if (picA == null && picB == null)
-			return null;
-		if (picA != null && picB == null)
+		if (Objects.equals(picA, picB))
 			return picA;
-		if (picA == null && picB != null)
+		if (picA != null && (picB == null || picA.getColor().getType() == ColorType.Intersection))
+			return picA;
+		if (picB != null && (picA == null || picB.getColor().getType() == ColorType.Intersection))
 			return picB;
 
 		final @NonNull PaintedColor mergedColor = colorMerged.apply(picA.color, picB.color);

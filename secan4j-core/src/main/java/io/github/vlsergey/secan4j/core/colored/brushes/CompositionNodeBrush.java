@@ -24,8 +24,12 @@ public class CompositionNodeBrush implements ColorPaintBrush {
 		}
 
 		BrushUtils.getAllNodesWithType(colorlessGraph, AnyOfNode.class).forEach(node -> {
+			ColoredObject toColorWith = null;
 			for (DataNode inputNode : node.getInputs()) {
-				onTouch.accept(node, oldColors.get(inputNode));
+				toColorWith = ColoredObject.mergeToMostDangerous(null, oldColors.get(inputNode));
+			}
+			if (toColorWith != null) {
+				onTouch.accept(node, toColorWith);
 			}
 		});
 	}

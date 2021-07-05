@@ -40,9 +40,11 @@ public class ColorApplier implements BiConsumer<DataNode, ColoredObject> {
 		final @Nullable ColoredObject oldNewColor = newColors.get(dataNode);
 		if (oldNewColor != null) {
 			final @NonNull ColoredObject merged = ColoredObject.merge(oldNewColor, newColor, this.problemsReporter);
-			log.debug("Merged color with type {} will be applied to {}, as merged from 2:\n* {}\n* {}",
-					merged.getColor().getType(), dataNode, oldNewColor, newColor);
-			newColors.put(dataNode, merged);
+			if (!merged.equals(oldNewColor)) {
+				log.debug("Merged color with type {} will be applied to {}, as merged from 2:\n1. {}\n2. {}\nR. {}",
+						merged.getColor().getType(), dataNode, oldNewColor, newColor, merged);
+				newColors.put(dataNode, merged);
+			}
 			return;
 		}
 
@@ -56,8 +58,8 @@ public class ColorApplier implements BiConsumer<DataNode, ColoredObject> {
 
 		final @NonNull ColoredObject merged = ColoredObject.merge(oldColor, newColor, this.problemsReporter);
 		if (!merged.equals(oldColor)) {
-			log.debug("Merged color with type {} will be applied to {}, as merged from 2:\n* {}\n* {}",
-					merged.getColor().getType(), dataNode, oldColor, newColor);
+			log.debug("Merged color with type {} will be applied to {}, as merged from 2:\n1. {}\n2. {}\nR. {}",
+					merged.getColor().getType(), dataNode, oldColor, newColor, merged);
 			newColors.put(dataNode, merged);
 		}
 	}
