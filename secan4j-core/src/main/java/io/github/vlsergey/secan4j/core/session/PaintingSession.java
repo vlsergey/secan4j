@@ -31,7 +31,6 @@ import io.github.vlsergey.secan4j.core.colored.brushes.InvocationsImplicitColore
 import io.github.vlsergey.secan4j.core.colored.brushes.InvokeDynamicBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.MethodParameterImplicitColorer;
 import io.github.vlsergey.secan4j.core.colored.brushes.ParentAttributesDefinerBrush;
-import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
 import io.github.vlsergey.secan4j.core.session.PaintingTask.Result;
@@ -101,7 +100,7 @@ public class PaintingSession {
 				new CopierBrush(dataProvider), new ParentAttributesDefinerBrush(dataProvider),
 				new InvocationsBrush(this), new InvokeDynamicBrush());
 
-		this.graphColorer = new GraphColorer(initialBrushes, repeatableBrushes, new ColorlessGraphBuilder());
+		this.graphColorer = new GraphColorer(initialBrushes, repeatableBrushes);
 	}
 
 	public @Nullable ColoredObject[][] analyze(CtBehavior ctMethod) throws ExecutionException, InterruptedException {

@@ -28,8 +28,6 @@ public class GraphColorer {
 
 	private final @NonNull List<ColorPaintBrush> brushesRepeatable;
 
-	private final @NonNull ColorlessGraphBuilder colorlessGraphBuilder;
-
 	@Data
 	private static final class InitialColoredMethodGraph {
 		private final BlockDataGraph colorlessGraph;
@@ -42,7 +40,8 @@ public class GraphColorer {
 	private @NonNull Optional<InitialColoredMethodGraph> buildInitialColoredMethodGraph(final @NonNull CtClass ctClass,
 			final @NonNull CtBehavior ctMethod,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
-		final @NonNull Optional<BlockDataGraph> opColorlessGraph = colorlessGraphBuilder.buildGraph(ctClass, ctMethod);
+		final @NonNull Optional<BlockDataGraph> opColorlessGraph = new ColorlessGraphBuilder(ctClass.getClassPool(),
+				ctClass, ctMethod).buildGraph();
 		if (opColorlessGraph.isEmpty()) {
 			return Optional.empty();
 		}

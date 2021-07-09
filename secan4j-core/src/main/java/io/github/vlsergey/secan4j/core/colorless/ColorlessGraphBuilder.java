@@ -150,16 +150,15 @@ public class ColorlessGraphBuilder {
 		return result;
 	}
 
-	private static void processInstructionWithStackOnly(final @NonNull ConstPool constPool,
-			final @NonNull CodeIterator iterator, final int index, final @NonNull Deque<DataNode> currentStack,
-			final int toPoll, final @NonNull Supplier<Type> typeOfNextStackTop) {
-		processInstructionWithStackOnly(currentStack, iterator.byteAt(index), toPoll, typeOfNextStackTop,
-				() -> new DataNode(InstructionPrinter.instructionString(iterator, index, constPool)));
+	private void processInstructionWithStackOnly(final int index, final @NonNull Deque<DataNode> currentStack,
+			final int toPoll) {
+		processInstructionWithStackOnly(currentStack, methodCodeIterator.byteAt(index), toPoll,
+				() -> new DataNode(InstructionPrinter.instructionString(methodCodeIterator, index, methodConstPool)));
 	}
 
-	private static void processInstructionWithStackOnly(final @NonNull Deque<DataNode> currentStack, final int op,
-			final int toPoll, final @NonNull Supplier<Type> typeOfNextStackTop, Supplier<DataNode> resultTypeSupplier) {
-		DataNode result = resultTypeSupplier.get().setOperation(op).setType(typeOfNextStackTop.get());
+	private void processInstructionWithStackOnly(final @NonNull Deque<DataNode> currentStack, final int op,
+			final int toPoll, Supplier<DataNode> resultTypeSupplier) {
+		DataNode result = resultTypeSupplier.get().setOperation(op).setType(getTypeOfNextStackTop());
 		DataNode[] inputs = new DataNode[toPoll];
 		for (int i = 0; i < toPoll; i++) {
 			inputs[i] = currentStack.pop();
@@ -168,18 +167,44 @@ public class ColorlessGraphBuilder {
 		currentStack.push(result);
 	}
 
-	@SneakyThrows
-	public @NonNull Optional<BlockDataGraph> buildGraph(final CtClass ctClass, final @NonNull CtBehavior ctMethod) {
-		ControlFlow controlFlow = new ControlFlow(ctClass, ctMethod.getMethodInfo());
+	private final @NonNull ClassPool classPool;
+	private final @NonNull CtClass ctClass;
+	private final @NonNull CtBehavior ctMethod;
+	private final @NonNull Block[] methodBasicBlocks;
+	private final @NonNull CodeAttribute methodCodeAttribute;
+	private final @NonNull CodeIterator methodCodeIterator;
+	private final @NonNull ConstPool methodConstPool;
+	private final @NonNull ControlFlow methodControlFlow;
 
-		final Block[] basicBlocks = controlFlow.basicBlocks();
-		if (basicBlocks == null || basicBlocks.length == 0) {
+	@SneakyThrows
+	public ColorlessGraphBuilder(final @NonNull ClassPool classPool, final @NonNull CtClass ctClass,
+			final @NonNull CtBehavior ctMethod) {
+		this.classPool = classPool;
+		this.ctClass = ctClass;
+		this.ctMethod = ctMethod;
+
+		this.methodControlFlow = new ControlFlow(ctClass, ctMethod.getMethodInfo());
+		this.methodBasicBlocks = methodControlFlow.basicBlocks();
+
+		this.methodCodeAttribute = ctMethod.getMethodInfo2().getCodeAttribute();
+		if (methodCodeAttribute != null) {
+			this.methodConstPool = methodCodeAttribute.getConstPool();
+			this.methodCodeIterator = methodCodeAttribute.iterator();
+		} else {
+			this.methodConstPool = null;
+			this.methodCodeIterator = null;
+		}
+	}
+
+	@SneakyThrows
+	public @NonNull Optional<BlockDataGraph> buildGraph() {
+		if (this.methodBasicBlocks == null || this.methodBasicBlocks.length == 0) {
 			return Optional.empty();
 		}
 
-		final Node rootNode = controlFlow.dominatorTree()[0];
+		final Node rootNode = methodControlFlow.dominatorTree()[0];
 		final Block rootBlock = rootNode.block();
-		final Frame rootFrame = controlFlow.frameAt(rootBlock.position());
+		final Frame rootFrame = methodControlFlow.frameAt(rootBlock.position());
 
 		final DataNode[] incLocalNodes = new DataNode[rootFrame.localsLength()];
 
@@ -201,9 +226,8 @@ public class ColorlessGraphBuilder {
 		}
 
 		final Map<BlockDataGraphKey, BlockDataGraph> done = new LinkedHashMap<>();
-		final int[] blockEnters = new int[basicBlocks.length];
-		buildGraphRecursively(ctClass, ctMethod, controlFlow, done, rootNode.block(), incLocalNodes, EMPTY_STACK,
-				blockEnters);
+		final int[] blockEnters = new int[methodBasicBlocks.length];
+		buildGraphRecursively(done, rootNode.block(), incLocalNodes, EMPTY_STACK, blockEnters);
 
 		if (TRACE) {
 			System.out.println("Block enters: " + Arrays.toString(blockEnters));
@@ -235,16 +259,23 @@ public class ColorlessGraphBuilder {
 	}
 
 	@SneakyThrows
-	private BlockDataGraph buildGraphImpl(final @NonNull CtClass ctClass, final @NonNull CtBehavior ctMethod,
-			final @NonNull ControlFlow controlFlow, final @NonNull Block block, final @NonNull DataNode[] incLocalNodes,
+	private Type getTypeOfNextStackTop() {
+		final Frame nextInstructionFrame = methodControlFlow.frameAt(methodCodeIterator.lookAhead());
+		final int topIndex = nextInstructionFrame.getTopIndex();
+		final Type onTopOfStack = nextInstructionFrame.getStack(topIndex);
+		if (onTopOfStack == Type.TOP) {
+			final Type beforeTop = nextInstructionFrame.getStack(topIndex - 1);
+			assert beforeTop.getSize() == 2;
+			return beforeTop;
+		}
+		return onTopOfStack;
+	}
+
+	@SneakyThrows
+	private BlockDataGraph buildGraphImpl(final @NonNull Block block, final @NonNull DataNode[] incLocalNodes,
 			final @NonNull Deque<DataNode> incStack) {
 		final int firstPos = block.position();
 		final int length = block.length();
-
-		final CodeAttribute codeAttribute = ctMethod.getMethodInfo2().getCodeAttribute();
-		final ClassPool classPool = ctClass.getClassPool();
-		final ConstPool constPool = codeAttribute.getConstPool();
-		final CodeIterator iterator = codeAttribute.iterator();
 
 		final DataNode[] currentLocals = Arrays.copyOf(incLocalNodes, incLocalNodes.length);
 		final Deque<DataNode> currentStack = new LinkedList<>(incStack);
@@ -259,14 +290,14 @@ public class ColorlessGraphBuilder {
 		allNodesSet.addAll(Arrays.asList(currentLocals));
 
 		int index;
-		iterator.move(firstPos);
+		methodCodeIterator.move(firstPos);
 
 		if (TRACE) {
 			System.out.println();
 			System.out.println("Method: " + ctMethod.getLongName());
 			System.out.println("Block: " + block);
 
-			final Frame frame = controlFlow.frameAt(block.position());
+			final Frame frame = methodControlFlow.frameAt(block.position());
 			System.out.println("Frame: " + frame);
 			System.out.println();
 
@@ -277,13 +308,14 @@ public class ColorlessGraphBuilder {
 
 		}
 
-		assertSameTypeOnFrameLocals(currentLocals, controlFlow.frameAt(block.position()));
-		assertSameSizeOnFrameStack(currentStack, controlFlow.frameAt(block.position()));
+		assertSameTypeOnFrameLocals(currentLocals, methodControlFlow.frameAt(block.position()));
+		assertSameSizeOnFrameStack(currentStack, methodControlFlow.frameAt(block.position()));
 
-		while (iterator.hasNext() && (index = iterator.next()) < firstPos + length) {
+		while (methodCodeIterator.hasNext() && (index = methodCodeIterator.next()) < firstPos + length) {
 			if (TRACE) {
-				System.out.println(index + ":\t" + InstructionPrinter.instructionString(iterator, index, constPool));
-				System.out.println(controlFlow.frameAt(index));
+				System.out.println(index + ":\t"
+						+ InstructionPrinter.instructionString(methodCodeIterator, index, methodConstPool));
+				System.out.println(methodControlFlow.frameAt(index));
 				System.out.println("* Before: ");
 				System.out.println("* * Locals: ");
 				Arrays.asList(currentLocals).forEach(dn -> System.out.println("* * * " + dn));
@@ -291,10 +323,10 @@ public class ColorlessGraphBuilder {
 				currentStack.forEach(dn -> System.out.println("* * * " + dn));
 			}
 
-			assertSameTypeOnFrameLocals(currentLocals, controlFlow.frameAt(index));
-			assertSameSizeOnFrameStack(currentStack, controlFlow.frameAt(index));
+			assertSameTypeOnFrameLocals(currentLocals, methodControlFlow.frameAt(index));
+			assertSameSizeOnFrameStack(currentStack, methodControlFlow.frameAt(index));
 
-			toReturn = processInstruction(classPool, constPool, new Heap() {
+			toReturn = processInstruction(new Heap() {
 
 				@Override
 				public DataNode getField(DataNode ref, String fieldRef) {
@@ -306,29 +338,14 @@ public class ColorlessGraphBuilder {
 					throw new UnsupportedOperationException("NYI");
 				}
 
-			}, currentLocals, currentStack, toReturn, invokations, putFieldNodes, putStaticNodes, iterator, index,
-					() -> {
-						try {
-							final Frame nextInstructionFrame = controlFlow.frameAt(iterator.lookAhead());
-							final int topIndex = nextInstructionFrame.getTopIndex();
-							final Type onTopOfStack = nextInstructionFrame.getStack(topIndex);
-							if (onTopOfStack == Type.TOP) {
-								final Type beforeTop = nextInstructionFrame.getStack(topIndex - 1);
-								assert beforeTop.getSize() == 2;
-								return beforeTop;
-							}
-							return onTopOfStack;
-						} catch (BadBytecode exc) {
-							throw new RuntimeException(exc);
-						}
-					});
+			}, currentLocals, currentStack, toReturn, invokations, putFieldNodes, putStaticNodes, index);
 
 			allNodesSet.addAll(currentStack);
 			allNodesSet.addAll(Arrays.asList(currentLocals));
 
-			int nextIndex = iterator.lookAhead();
+			int nextIndex = methodCodeIterator.lookAhead();
 			if (nextIndex < firstPos + length) {
-				final Frame nextFrame = controlFlow.frameAt(nextIndex);
+				final Frame nextFrame = methodControlFlow.frameAt(nextIndex);
 
 				if (TRACE) {
 					System.out.println("* After: ");
@@ -354,8 +371,7 @@ public class ColorlessGraphBuilder {
 	}
 
 	@SneakyThrows
-	private void buildGraphRecursively(final @NonNull CtClass ctClass, final @NonNull CtBehavior ctMethod,
-			final @NonNull ControlFlow controlFlow, final @NonNull Map<BlockDataGraphKey, BlockDataGraph> done,
+	private void buildGraphRecursively(final @NonNull Map<BlockDataGraphKey, BlockDataGraph> done,
 			final @NonNull Block block, final @NonNull DataNode[] incLocalNodes,
 			final @NonNull Deque<DataNode> incStackNodes, final @NonNull int[] blockEnters) {
 
@@ -369,13 +385,13 @@ public class ColorlessGraphBuilder {
 			return;
 		}
 
-		BlockDataGraph blockGraph = buildGraphImpl(ctClass, ctMethod, controlFlow, block, incLocalNodes, incStackNodes);
+		BlockDataGraph blockGraph = buildGraphImpl(block, incLocalNodes, incStackNodes);
 		done.put(key, blockGraph);
 
 		for (int e = 0; e < block.exits(); e++) {
 			Block exitBlock = block.exit(e);
-			buildGraphRecursively(ctClass, ctMethod, controlFlow, done, exitBlock, blockGraph.getOutLocalNodes(),
-					blockGraph.getOutStackNodes(), blockEnters);
+			buildGraphRecursively(done, exitBlock, blockGraph.getOutLocalNodes(), blockGraph.getOutStackNodes(),
+					blockEnters);
 		}
 
 	}
@@ -411,19 +427,18 @@ public class ColorlessGraphBuilder {
 
 	// TODO: extract to class with fields... too many arguments
 	@SneakyThrows
-	private DataNode processInstruction(final ClassPool classPool, final ConstPool constPool, final Heap heap,
-			final DataNode[] currentLocals, final Deque<DataNode> currentStack, DataNode toReturn,
-			List<Invocation> invokations, List<PutFieldNode> putFieldNodes, List<PutStaticNode> putStaticNodes,
-			final CodeIterator iterator, int index, Supplier<Type> typeOfNextStackTop) {
+	private DataNode processInstruction(final Heap heap, final DataNode[] currentLocals,
+			final Deque<DataNode> currentStack, DataNode toReturn, final List<Invocation> invokations,
+			final List<PutFieldNode> putFieldNodes, final List<PutStaticNode> putStaticNodes, final int index) {
 
-		int op = iterator.byteAt(index);
+		int op = methodCodeIterator.byteAt(index);
 		switch (op) {
 		case Opcode.ACONST_NULL:
 			currentStack.push(CONST_NULL);
 			break;
 
 		case Opcode.ALOAD:
-			currentStack.push(currentLocals[iterator.byteAt(index + 1)]);
+			currentStack.push(currentLocals[methodCodeIterator.byteAt(index + 1)]);
 			break;
 
 		case Opcode.ALOAD_0:
@@ -439,11 +454,11 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.ARRAYLENGTH:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 1);
 			break;
 
 		case Opcode.ASTORE:
-			currentLocals[iterator.byteAt(index + 1)] = currentStack.pop();
+			currentLocals[methodCodeIterator.byteAt(index + 1)] = currentStack.pop();
 			break;
 
 		case Opcode.ASTORE_0:
@@ -466,7 +481,7 @@ public class ColorlessGraphBuilder {
 		case Opcode.IALOAD:
 		case Opcode.LALOAD:
 		case Opcode.SALOAD: {
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 2, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 2);
 			break;
 		}
 
@@ -483,15 +498,15 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.BIPUSH:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 0, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 0);
 			break;
 
 		case Opcode.CHECKCAST:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 1);
 			break;
 
 		case Opcode.DLOAD: {
-			final int varIndex = iterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(index + 1);
 			currentStack.push(currentLocals[varIndex]);
 			break;
 		}
@@ -503,7 +518,7 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.DSTORE: {
-			final int varIndex = iterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(index + 1);
 			currentLocals[varIndex] = currentStack.pop();
 			break;
 		}
@@ -519,7 +534,7 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.FLOAD:
-			currentStack.push(currentLocals[iterator.byteAt(index + 1)]);
+			currentStack.push(currentLocals[methodCodeIterator.byteAt(index + 1)]);
 			assert currentStack.peek().type == Type.FLOAT;
 			break;
 
@@ -533,21 +548,19 @@ public class ColorlessGraphBuilder {
 
 		case Opcode.GETFIELD:
 		case Opcode.GETSTATIC: {
-			int constantIndex = iterator.u16bitAt(index + 1);
-			final String fieldrefClassName = constPool.getFieldrefClassName(constantIndex);
-			final String fieldrefName = constPool.getFieldrefName(constantIndex);
-			final String fieldrefType = constPool.getFieldrefType(constantIndex);
+			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
+			final String fieldrefClassName = methodConstPool.getFieldrefClassName(constantIndex);
+			final String fieldrefName = methodConstPool.getFieldrefName(constantIndex);
+			final String fieldrefType = methodConstPool.getFieldrefType(constantIndex);
 
 			final CtClass fieldClass = classPool.get(fieldrefClassName);
 			final CtField ctField = fieldClass.getField(fieldrefName, fieldrefType);
 
 			// XXX: USE HEAP
 			if (op == Opcode.GETFIELD) {
-				processInstructionWithStackOnly(currentStack, op, 1, typeOfNextStackTop,
-						() -> new GetFieldNode(fieldClass, ctField));
+				processInstructionWithStackOnly(currentStack, op, 1, () -> new GetFieldNode(fieldClass, ctField));
 			} else {
-				processInstructionWithStackOnly(currentStack, op, 0, typeOfNextStackTop,
-						() -> new GetStaticNode(fieldClass, ctField));
+				processInstructionWithStackOnly(currentStack, op, 0, () -> new GetStaticNode(fieldClass, ctField));
 			}
 			break;
 		}
@@ -562,7 +575,7 @@ public class ColorlessGraphBuilder {
 		case Opcode.I2F:
 		case Opcode.I2L:
 		case Opcode.I2S:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 1);
 			break;
 
 		case Opcode.IADD:
@@ -576,7 +589,7 @@ public class ColorlessGraphBuilder {
 		case Opcode.ISUB:
 		case Opcode.IUSHR:
 		case Opcode.IXOR:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 2, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 2);
 			break;
 
 		case Opcode.ICONST_0:
@@ -612,15 +625,16 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.IINC: {
-			DataNode prevValue = currentLocals[iterator.byteAt(index + 1)];
-			DataNode nextValue = new DataNode(InstructionPrinter.instructionString(iterator, index, constPool))
-					.setInputs(new DataNode[] { prevValue }).setOperation(op).setType(prevValue.getType());
-			currentLocals[iterator.byteAt(index + 1)] = nextValue;
+			DataNode prevValue = currentLocals[methodCodeIterator.byteAt(index + 1)];
+			DataNode nextValue = new DataNode(
+					InstructionPrinter.instructionString(methodCodeIterator, index, methodConstPool))
+							.setInputs(new DataNode[] { prevValue }).setOperation(op).setType(prevValue.getType());
+			currentLocals[methodCodeIterator.byteAt(index + 1)] = nextValue;
 			break;
 		}
 
 		case Opcode.ILOAD:
-			currentStack.push(currentLocals[iterator.byteAt(index + 1)]);
+			currentStack.push(currentLocals[methodCodeIterator.byteAt(index + 1)]);
 			break;
 		case Opcode.ILOAD_0:
 		case Opcode.ILOAD_1:
@@ -631,19 +645,18 @@ public class ColorlessGraphBuilder {
 
 		case Opcode.INEG:
 		case Opcode.INSTANCEOF: {
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 1);
 			break;
 		}
 
 		case Opcode.INVOKEDYNAMIC: {
-			int constantIndex = iterator.u16bitAt(index + 1);
+			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
 
-			final int nameAndType = constPool.getInvokeDynamicNameAndType(constantIndex);
-			final String signature = constPool.getUtf8Info(constPool.getNameAndTypeDescriptor(nameAndType));
+			final int nameAndType = methodConstPool.getInvokeDynamicNameAndType(constantIndex);
+			final String signature = methodConstPool.getUtf8Info(methodConstPool.getNameAndTypeDescriptor(nameAndType));
 
 			final MethodSignature methodSignature = SignatureAttribute.toMethodSignature(signature);
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack,
-					methodSignature.getParameterTypes().length, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, methodSignature.getParameterTypes().length);
 			break;
 		}
 
@@ -651,7 +664,7 @@ public class ColorlessGraphBuilder {
 		case Opcode.INVOKESPECIAL:
 		case Opcode.INVOKESTATIC:
 		case Opcode.INVOKEVIRTUAL: {
-			int constantIndex = iterator.u16bitAt(index + 1);
+			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
 
 			String className = null;
 			String methodName = null;
@@ -664,13 +677,13 @@ public class ColorlessGraphBuilder {
 			 */
 			if (op == Opcode.INVOKEINTERFACE || op == Opcode.INVOKESPECIAL || op == Opcode.INVOKEVIRTUAL
 					|| op == Opcode.INVOKESTATIC) {
-				className = constPool.getMethodrefClassName(constantIndex);
-				methodName = constPool.getMethodrefName(constantIndex);
-				signature = constPool.getMethodrefType(constantIndex);
+				className = methodConstPool.getMethodrefClassName(constantIndex);
+				methodName = methodConstPool.getMethodrefName(constantIndex);
+				signature = methodConstPool.getMethodrefType(constantIndex);
 			} else {
-				final int nameAndType = constPool.getInvokeDynamicNameAndType(constantIndex);
-				methodName = constPool.getUtf8Info(constPool.getNameAndTypeName(nameAndType));
-				signature = constPool.getUtf8Info(constPool.getNameAndTypeDescriptor(nameAndType));
+				final int nameAndType = methodConstPool.getInvokeDynamicNameAndType(constantIndex);
+				methodName = methodConstPool.getUtf8Info(methodConstPool.getNameAndTypeName(nameAndType));
+				signature = methodConstPool.getUtf8Info(methodConstPool.getNameAndTypeDescriptor(nameAndType));
 			}
 
 			CtClass[] params = Descriptor.getParameterTypes(signature, classPool);
@@ -707,7 +720,7 @@ public class ColorlessGraphBuilder {
 		}
 
 		case Opcode.ISTORE:
-			currentLocals[iterator.byteAt(index + 1)] = currentStack.pop();
+			currentLocals[methodCodeIterator.byteAt(index + 1)] = currentStack.pop();
 			break;
 
 		case Opcode.ISTORE_0:
@@ -720,7 +733,7 @@ public class ColorlessGraphBuilder {
 		case Opcode.LADD:
 		case Opcode.LAND:
 		case Opcode.LCMP:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 2, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 2);
 			break;
 
 		case Opcode.LCONST_0:
@@ -732,12 +745,13 @@ public class ColorlessGraphBuilder {
 
 		case Opcode.LDC:
 		case Opcode.LDC_W: {
-			int tagIndex = op == Opcode.LDC ? iterator.byteAt(index + 1) : iterator.u16bitAt(index + 1);
+			int tagIndex = op == Opcode.LDC ? methodCodeIterator.byteAt(index + 1)
+					: methodCodeIterator.u16bitAt(index + 1);
 			String description = "constant #" + tagIndex;
 
-			Type type = getType(classPool, constPool, tagIndex);
+			Type type = getType(classPool, methodConstPool, tagIndex);
 			if (type.getCtClass().getName().equals("java.lang.String")) {
-				description = "\"" + constPool.getStringInfo(tagIndex) + "\"";
+				description = "\"" + methodConstPool.getStringInfo(tagIndex) + "\"";
 			}
 
 			currentStack.push(new DataNode(description).setType(type));
@@ -745,12 +759,12 @@ public class ColorlessGraphBuilder {
 		}
 
 		case Opcode.LDC2_W: {
-			int tagIndex = iterator.u16bitAt(index + 1);
+			int tagIndex = methodCodeIterator.u16bitAt(index + 1);
 			String description = "constant #" + tagIndex;
 
-			Type type = getType(classPool, constPool, tagIndex);
+			Type type = getType(classPool, methodConstPool, tagIndex);
 			if (type.getCtClass().getName().equals("java.lang.String")) {
-				description = "\"" + constPool.getUtf8Info(index) + "\"";
+				description = "\"" + methodConstPool.getUtf8Info(index) + "\"";
 			}
 
 			currentStack.push(new DataNode(description).setType(type));
@@ -758,7 +772,7 @@ public class ColorlessGraphBuilder {
 		}
 
 		case Opcode.LLOAD: {
-			final int varIndex = iterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(index + 1);
 			currentStack.push(currentLocals[varIndex]);
 			break;
 		}
@@ -770,7 +784,7 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.LSTORE: {
-			final int varIndex = iterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(index + 1);
 			currentLocals[varIndex] = currentStack.pop();
 			break;
 		}
@@ -782,10 +796,10 @@ public class ColorlessGraphBuilder {
 			break;
 
 		case Opcode.NEW:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 0, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 0);
 			break;
 		case Opcode.NEWARRAY:
-			processInstructionWithStackOnly(constPool, iterator, index, currentStack, 1, typeOfNextStackTop);
+			processInstructionWithStackOnly(index, currentStack, 1);
 			break;
 
 		case Opcode.POP: {
@@ -805,10 +819,10 @@ public class ColorlessGraphBuilder {
 
 		case Opcode.PUTFIELD:
 		case Opcode.PUTSTATIC: {
-			int constantIndex = iterator.u16bitAt(index + 1);
-			final String fieldrefClassName = constPool.getFieldrefClassName(constantIndex);
-			final String fieldrefName = constPool.getFieldrefName(constantIndex);
-			final String fieldrefType = constPool.getFieldrefType(constantIndex);
+			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
+			final String fieldrefClassName = methodConstPool.getFieldrefClassName(constantIndex);
+			final String fieldrefName = methodConstPool.getFieldrefName(constantIndex);
+			final String fieldrefType = methodConstPool.getFieldrefType(constantIndex);
 
 			final CtClass fieldClass = classPool.get(fieldrefClassName);
 			final CtField ctField = fieldClass.getField(fieldrefName, fieldrefType);
@@ -823,7 +837,7 @@ public class ColorlessGraphBuilder {
 		}
 
 		case Opcode.SIPUSH:
-			int constantValue = iterator.u16bitAt(index + 1);
+			int constantValue = methodCodeIterator.u16bitAt(index + 1);
 			currentStack.push(new DataNode("shoart as int " + constantValue).setOperation(op).setType(Type.INTEGER));
 			break;
 

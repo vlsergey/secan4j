@@ -18,8 +18,9 @@ import javassist.NotFoundException;
 
 class BatchColorlessGraphBuilderTest {
 
+	private static final ClassPool classPool = ClassPool.getDefault();
+
 	private static Stream<Arguments> provideMethods() throws Exception {
-		final ClassPool classPool = ClassPool.getDefault();
 
 		final Function<Class<?>, CtClass> toCtClass = cls -> {
 			try {
@@ -40,7 +41,7 @@ class BatchColorlessGraphBuilderTest {
 	@ParameterizedTest
 	@MethodSource("provideMethods")
 	void testBuildGraph(CtClass ctClass, CtMethod ctMethod) throws Exception {
-		final BlockDataGraph graph = new ColorlessGraphBuilder().buildGraph(ctClass, ctMethod).orElse(null);
+		final BlockDataGraph graph = new ColorlessGraphBuilder(classPool, ctClass, ctMethod).buildGraph().orElse(null);
 		assertNotNull((graph == null) == ctMethod.isEmpty());
 	}
 

@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import io.github.vlsergey.secan4j.core.colored.brushes.CopierBrush;
 import io.github.vlsergey.secan4j.core.colored.brushes.MethodParameterImplicitColorer;
-import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
 import io.github.vlsergey.secan4j.core.user2command.UserToCommandInjectionColorer;
 import io.github.vlsergey.secan4j.data.DataProvider;
 import javassist.ClassPool;
@@ -24,7 +23,6 @@ import lombok.NonNull;
 public class GraphColorerTest {
 
 	private final ClassPool classPool = ClassPool.getDefault();
-	private final ColorlessGraphBuilder colorlessGraphBuilder = new ColorlessGraphBuilder();
 	private final DataProvider dataProvider = new DataProvider();
 	private final UserToCommandInjectionColorer userToCommand = new UserToCommandInjectionColorer(dataProvider);
 
@@ -32,7 +30,7 @@ public class GraphColorerTest {
 	void testArraycopy() throws Exception {
 		final GraphColorer graphColorer = new GraphColorer(
 				Arrays.asList(new MethodParameterImplicitColorer(userToCommand)),
-				singletonList(new CopierBrush(dataProvider)), colorlessGraphBuilder);
+				singletonList(new CopierBrush(dataProvider)));
 
 		final CtClass ctClass = classPool.get(SimpleColoredMethods.class.getName());
 		final CtMethod ctMethod = ctClass.getDeclaredMethod("arraycopy");
