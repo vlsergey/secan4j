@@ -1,16 +1,14 @@
 package io.github.vlsergey.secan4j.core.colored;
 
-import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.annotation.Nullable;
 
@@ -52,7 +50,7 @@ public class ColoredObject {
 	}
 
 	public static ColoredObject forRootOnly(final @NonNull CtClass cls, PaintedColor color) {
-		return new ColoredObject(color, emptyMap(), null, singleton(cls.getName().intern()));
+		return new ColoredObject(color, singleton(cls.getName().intern()));
 	}
 
 	public static @NonNull ColoredObject merge(final @Nullable ColoredObject picA, final @Nullable ColoredObject picB,
@@ -71,6 +69,22 @@ public class ColoredObject {
 			}
 			return a.getConfidence().getValue() >= b.getConfidence().getValue() ? a : b;
 		});
+	}
+
+	private static @Nullable ColoredObject mergeImpl(final @Nullable ColoredObject picA,
+			final @Nullable ColoredObject picB,
+			final @NonNull BiFunction<PaintedColor, PaintedColor, PaintedColor> colorMerged) {
+		if (Objects.equals(picA, picB))
+			return picA;
+		if (picA != null && (picB == null || picA.getColor().getType() == ColorType.Intersection))
+			return picA;
+		if (picB != null && (picA == null || picB.getColor().getType() == ColorType.Intersection))
+			return picB;
+
+		final @NonNull PaintedColor mergedColor = colorMerged.apply(picA.color, picB.color);
+		final @NonNull Set<String> mergedSeendClassesHere = SetUtils.join(picA.seenClassesHere, picB.seenClassesHere);
+
+		return new ColoredObject(mergedColor, mergedSeendClassesHere);
 	}
 
 	/**
@@ -99,61 +113,6 @@ public class ColoredObject {
 		});
 	}
 
-	private static @Nullable ColoredObject mergeImpl(final @Nullable ColoredObject picA,
-			final @Nullable ColoredObject picB,
-			final @NonNull BiFunction<PaintedColor, PaintedColor, PaintedColor> colorMerged) {
-		if (Objects.equals(picA, picB))
-			return picA;
-		if (picA != null && (picB == null || picA.getColor().getType() == ColorType.Intersection))
-			return picA;
-		if (picB != null && (picA == null || picB.getColor().getType() == ColorType.Intersection))
-			return picB;
-
-		final @NonNull PaintedColor mergedColor = colorMerged.apply(picA.color, picB.color);
-
-		final @Nullable ColoredObject mergedItemOfArrayNode = mergeImpl(picA.itemOfArrayNode, picB.itemOfArrayNode,
-				colorMerged);
-
-		final @NonNull Set<String> mergedSeendClassesHere = SetUtils.join(picA.seenClassesHere, picB.seenClassesHere);
-
-		final @NonNull Map<String, Map<String, ColoredObject>> mergedFieldNodes = mergeMaps(picA.fieldNodes,
-				picB.fieldNodes, (fieldNodesA, fieldNodesB) -> mergeMaps(fieldNodesA, fieldNodesB,
-						(fieldColorA, fieldColorB) -> mergeImpl(fieldColorA, fieldColorB, colorMerged)));
-
-		return new ColoredObject(mergedColor, mergedFieldNodes, mergedItemOfArrayNode, mergedSeendClassesHere);
-	}
-
-	private static <K, V> @NonNull Map<K, V> mergeMaps(@NonNull Map<K, V> a, @NonNull Map<K, V> b,
-			final @NonNull BiFunction<@NonNull V, @NonNull V, @NonNull V> valueMerger) {
-		if (a.isEmpty())
-			return b;
-		if (b.isEmpty())
-			return a;
-
-		final Set<K> allKeys = SetUtils.join(a.keySet(), b.keySet());
-		final Map<K, V> result = new HashMap<>(allKeys.size());
-		for (K key : allKeys) {
-			final V valueA = a.get(key);
-			final V valueB = b.get(key);
-			assert valueA != null || valueB != null;
-
-			if (valueA == null) {
-				result.put(key, valueB);
-				continue;
-			}
-			if (valueB == null) {
-				result.put(key, valueA);
-				continue;
-			}
-			assert valueA != null && valueB != null;
-
-			final @NonNull V mergedValue = valueMerger.apply(valueA, valueB);
-			result.put(key, mergedValue);
-		}
-
-		return result;
-	}
-
 	public static @NonNull ColoredObject sinkOnRoot(final TraceItem src, final @NonNull CtClass elementType,
 			final @NonNull Confidence confidence) {
 		return ColoredObject.forRootOnly(elementType, new PaintedColor(confidence, src, ColorType.SinkData));
@@ -166,10 +125,6 @@ public class ColoredObject {
 
 	private final @NonNull PaintedColor color;
 
-	private final @NonNull Map<String, Map<String, ColoredObject>> fieldNodes;
-
-	private final @Nullable ColoredObject itemOfArrayNode;
-
 	@With
 	private final @NonNull Set<String> seenClassesHere;
 
@@ -181,6 +136,12 @@ public class ColoredObject {
 		// TODO: implement deeper demultiplexing
 		// TODO: filter fieldNodes basing on seen class
 		this.seenClassesHere.forEach(cls -> consumer.accept(this.withSeenClassesHere(singleton(cls))));
+	}
+
+	public ColoredObject withNewTraceItem(Function<TraceItem, TraceItem> traceItemUpdater) {
+		return new ColoredObject(
+				new PaintedColor(color.getConfidence(), traceItemUpdater.apply(color.getSrc()), color.getType()),
+				seenClassesHere);
 	}
 
 }
