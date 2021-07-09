@@ -1,21 +1,24 @@
 package io.github.vlsergey.secan4j.core.colored.brushes;
 
+import static java.util.Collections.singletonMap;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 import io.github.vlsergey.secan4j.annotations.CopyAttributesFrom;
 import io.github.vlsergey.secan4j.annotations.CopyAttributesTo;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
+import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
 import io.github.vlsergey.secan4j.data.DataProvider;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.NonNull;
 
 /**
@@ -24,6 +27,25 @@ import lombok.NonNull;
  */
 @AllArgsConstructor
 public class CopierBrush implements ColorPaintBrush {
+
+	@Data
+	private static final class CopyTraceItem implements TraceItem {
+		private final TraceItem src;
+
+		private CopyTraceItem(TraceItem src) {
+			this.src = src;
+		}
+
+		@Override
+		public TraceItem findPrevious() {
+			return src;
+		}
+
+		@Override
+		public Map<String, ?> describe() {
+			return singletonMap("message", "Copy attributes");
+		}
+	}
 
 	private final @NonNull DataProvider dataProvider;
 
@@ -68,7 +90,8 @@ public class CopierBrush implements ColorPaintBrush {
 				assert sources.size() == 1 : "sources.size() != 1 (NYI)";
 				assert targets.size() == 1 : "targets.size() != 1 (NYI)";
 
-				BrushUtils.copyColor(oldColors, sources.get(0), Function.identity(), targets.get(0), onTouch);
+				BrushUtils.copyColor(oldColors, sources.get(0),
+						color -> color.withNewTraceItem(src -> new CopyTraceItem(src)), targets.get(0), onTouch);
 			}
 		}
 	}
