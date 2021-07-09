@@ -1,5 +1,7 @@
 package io.github.vlsergey.secan4j.core.colorless;
 
+import javax.annotation.Nullable;
+
 import javassist.bytecode.Opcode;
 import javassist.bytecode.analysis.Type;
 import lombok.Getter;
@@ -12,22 +14,29 @@ import lombok.ToString;
 @ToString
 // not a @Data -- different nodes with same content are different
 public class DataNode {
+
 	static final DataNode[] EMPTY_DATA_NODES = new DataNode[0];
 
-	final String description;
+	String description;
 
 	DataNode[] inputs = EMPTY_DATA_NODES;
 
 	int operation = Opcode.NOP;
 
+	@Nullable
+	SourceCodePosition sourceCodePosition;
+
 	@NonNull
 	Type type;
 
-	public DataNode(String description) {
+	DataNode() {
+	}
+
+	DataNode(String description) {
 		this.description = description;
 	}
 
-	public DataNode setType(final @NonNull Type type) {
+	DataNode setType(final @NonNull Type type) {
 		if (type == Type.TOP) {
 			throw new IllegalArgumentException();
 		}
