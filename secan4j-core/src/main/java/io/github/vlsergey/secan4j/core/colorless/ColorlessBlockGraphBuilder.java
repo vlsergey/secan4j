@@ -2,7 +2,6 @@ package io.github.vlsergey.secan4j.core.colorless;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashSet;
@@ -14,7 +13,6 @@ import java.util.function.Supplier;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtField;
-import javassist.NotFoundException;
 import javassist.bytecode.BadBytecode;
 import javassist.bytecode.CodeIterator;
 import javassist.bytecode.ConstPool;
@@ -28,18 +26,12 @@ import javassist.bytecode.analysis.ControlFlow;
 import javassist.bytecode.analysis.ControlFlow.Block;
 import javassist.bytecode.analysis.Frame;
 import javassist.bytecode.analysis.Type;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 
+@Getter
 public class ColorlessBlockGraphBuilder {
-
-	@Data
-	private static class BlockDataGraphKey {
-		final Block block;
-		final DataNode[] incLocalNodes;
-		final Collection<DataNode> incStackNodes;
-	}
 
 	private interface Heap {
 		DataNode getField(DataNode ref, String fieldRef);
@@ -63,30 +55,68 @@ public class ColorlessBlockGraphBuilder {
 
 	static final DataNode CONST_NULL = new DataNode("null").setType(Type.UNINIT);
 
+	private static final Heap HEAP = new Heap() {
+
+		@Override
+		public DataNode getField(DataNode ref, String fieldRef) {
+			throw new UnsupportedOperationException("NYI");
+		}
+
+		@Override
+		public void putField(DataNode ref, String fieldRef, DataNode value) {
+			throw new UnsupportedOperationException("NYI");
+		}
+
+	};
+
 	// TODO: replace with slf4j?
 	private static boolean TRACE = false;
 
-	static void assertIntAlike(DataNode dataNode) {
-		final Type actual = dataNode.type;
-		assert actual == Type.BYTE || actual == Type.CHAR || actual == Type.INTEGER
-				: "Expected int-alike, but found " + actual;
+	private final @NonNull Block block;
+	private final @NonNull ClassPool classPool;
+	private int currentIndex = -1;
+	private final DataNode[] currentLocals;
+	private final Deque<DataNode> currentStack;
+	private final @NonNull DataNode[] incLocalNodes;
+	private final @NonNull Deque<DataNode> incStack;
+	private final @NonNull CodeIterator methodCodeIterator;
+	private final @NonNull ConstPool methodConstPool;
+	private final @NonNull ControlFlow methodControlFlow;
+
+	public ColorlessBlockGraphBuilder(final @NonNull ClassPool classPool,
+			final @NonNull CodeIterator methodCodeIterator, final @NonNull ConstPool methodConstPool,
+			final @NonNull ControlFlow methodControlFlow, final @NonNull Block block,
+			final @NonNull DataNode[] incLocalNodes, final @NonNull Deque<DataNode> incStack) {
+		super();
+		this.classPool = classPool;
+		this.methodCodeIterator = methodCodeIterator;
+		this.methodConstPool = methodConstPool;
+		this.methodControlFlow = methodControlFlow;
+		this.block = block;
+
+		this.incLocalNodes = incLocalNodes;
+		this.incStack = incStack;
+
+		this.currentLocals = Arrays.copyOf(incLocalNodes, incLocalNodes.length);
+		this.currentStack = new LinkedList<>(incStack);
 	}
 
-	static void assertSameSizeOnFrameStack(Deque<DataNode> actual, Frame expected) {
-		if (actual.isEmpty()) {
+	private void assertSameSizeOnFrameStack(Frame expected) {
+		if (currentStack.isEmpty()) {
 			assert expected.getTopIndex() == -1;
 			return;
 		}
 
 		int topIndex = expected.getTopIndex();
-		assert actual.stream().map(DataNode::getType).mapToInt(Type::getSize).sum() == (topIndex + 1)
-				: "Size of DataNode stack is " + actual.stream().map(DataNode::getType).mapToInt(Type::getSize).sum()
+		assert currentStack.stream().map(DataNode::getType).mapToInt(Type::getSize).sum() == (topIndex + 1)
+				: "Size of DataNode stack is "
+						+ currentStack.stream().map(DataNode::getType).mapToInt(Type::getSize).sum()
 						+ ", but expected size was " + (topIndex + 1);
 	}
 
-	static void assertSameTypeOnFrameLocals(DataNode[] actual, Frame expected) {
-		for (int i = 0; i < actual.length; i++) {
-			DataNode dataNode = actual[i];
+	private void assertSameTypeOnFrameLocals(Frame expected) {
+		for (int i = 0; i < currentLocals.length; i++) {
+			DataNode dataNode = currentLocals[i];
 			if (dataNode == null) {
 				// dataNode is not assigned...
 				// it may be assigned later or it's part of "wide" type in another cell
@@ -99,61 +129,10 @@ public class ColorlessBlockGraphBuilder {
 		}
 	}
 
-	private void processInstructionWithStackOnly(final @NonNull Deque<DataNode> currentStack, final int toPoll) {
-		processInstructionWithStackOnly(currentStack, toPoll,
-				() -> new DataNode(InstructionPrinter.instructionString(methodCodeIterator, index, methodConstPool)));
-	}
-
-	private void processInstructionWithStackOnly(final @NonNull Deque<DataNode> currentStack, final int toPoll,
-			Supplier<DataNode> resultTypeSupplier) {
-		DataNode result = resultTypeSupplier.get().setOperation(getCurrentOp()).setType(getTypeOfNextStackTop());
-		DataNode[] inputs = new DataNode[toPoll];
-		for (int i = 0; i < toPoll; i++) {
-			inputs[i] = currentStack.pop();
-		}
-		result.inputs = inputs;
-		currentStack.push(result);
-	}
-
-	private final @NonNull ClassPool classPool;
-	private final @NonNull CodeIterator methodCodeIterator;
-	private final @NonNull ConstPool methodConstPool;
-	private final @NonNull ControlFlow methodControlFlow;
-	private final @NonNull Block block;
-
-	public ColorlessBlockGraphBuilder(final @NonNull ClassPool classPool,
-			final @NonNull CodeIterator methodCodeIterator, final @NonNull ConstPool methodConstPool,
-			final @NonNull ControlFlow methodControlFlow, final @NonNull Block block) {
-		super();
-		this.classPool = classPool;
-		this.methodCodeIterator = methodCodeIterator;
-		this.methodConstPool = methodConstPool;
-		this.methodControlFlow = methodControlFlow;
-		this.block = block;
-	}
-
-	private int index = -1;
-
 	@SneakyThrows
-	private Type getTypeOfNextStackTop() {
-		final Frame nextInstructionFrame = methodControlFlow.frameAt(methodCodeIterator.lookAhead());
-		final int topIndex = nextInstructionFrame.getTopIndex();
-		final Type onTopOfStack = nextInstructionFrame.getStack(topIndex);
-		if (onTopOfStack == Type.TOP) {
-			final Type beforeTop = nextInstructionFrame.getStack(topIndex - 1);
-			assert beforeTop.getSize() == 2;
-			return beforeTop;
-		}
-		return onTopOfStack;
-	}
-
-	@SneakyThrows
-	public BlockDataGraph buildGraph(final @NonNull DataNode[] incLocalNodes, final @NonNull Deque<DataNode> incStack) {
+	public BlockDataGraph buildGraph() {
 		final int firstPos = block.position();
 		final int length = block.length();
-
-		final DataNode[] currentLocals = Arrays.copyOf(incLocalNodes, incLocalNodes.length);
-		final Deque<DataNode> currentStack = new LinkedList<>(incStack);
 
 		DataNode toReturn = null;
 		List<Invocation> invokations = new ArrayList<>();
@@ -182,14 +161,14 @@ public class ColorlessBlockGraphBuilder {
 
 		}
 
-		assertSameTypeOnFrameLocals(currentLocals, methodControlFlow.frameAt(block.position()));
-		assertSameSizeOnFrameStack(currentStack, methodControlFlow.frameAt(block.position()));
+		assertSameTypeOnFrameLocals(methodControlFlow.frameAt(block.position()));
+		assertSameSizeOnFrameStack(methodControlFlow.frameAt(block.position()));
 
-		while (methodCodeIterator.hasNext() && (index = methodCodeIterator.next()) < firstPos + length) {
+		while (methodCodeIterator.hasNext() && (currentIndex = methodCodeIterator.next()) < firstPos + length) {
 			if (TRACE) {
-				System.out.println(index + ":\t"
-						+ InstructionPrinter.instructionString(methodCodeIterator, index, methodConstPool));
-				System.out.println(methodControlFlow.frameAt(index));
+				System.out.println(currentIndex + ":\t"
+						+ InstructionPrinter.instructionString(methodCodeIterator, currentIndex, methodConstPool));
+				System.out.println(methodControlFlow.frameAt(currentIndex));
 				System.out.println("* Before: ");
 				System.out.println("* * Locals: ");
 				Arrays.asList(currentLocals).forEach(dn -> System.out.println("* * * " + dn));
@@ -197,22 +176,10 @@ public class ColorlessBlockGraphBuilder {
 				currentStack.forEach(dn -> System.out.println("* * * " + dn));
 			}
 
-			assertSameTypeOnFrameLocals(currentLocals, methodControlFlow.frameAt(index));
-			assertSameSizeOnFrameStack(currentStack, methodControlFlow.frameAt(index));
+			assertSameTypeOnFrameLocals(methodControlFlow.frameAt(currentIndex));
+			assertSameSizeOnFrameStack(methodControlFlow.frameAt(currentIndex));
 
-			toReturn = processInstruction(new Heap() {
-
-				@Override
-				public DataNode getField(DataNode ref, String fieldRef) {
-					throw new UnsupportedOperationException("NYI");
-				}
-
-				@Override
-				public void putField(DataNode ref, String fieldRef, DataNode value) {
-					throw new UnsupportedOperationException("NYI");
-				}
-
-			}, currentLocals, currentStack, toReturn, invokations, putFieldNodes, putStaticNodes);
+			toReturn = processInstruction(HEAP, toReturn, invokations, putFieldNodes, putStaticNodes);
 
 			allNodesSet.addAll(currentStack);
 			allNodesSet.addAll(Arrays.asList(currentLocals));
@@ -231,8 +198,8 @@ public class ColorlessBlockGraphBuilder {
 					System.out.println();
 				}
 
-				assertSameTypeOnFrameLocals(currentLocals, nextFrame);
-				assertSameSizeOnFrameStack(currentStack, nextFrame);
+				assertSameTypeOnFrameLocals(nextFrame);
+				assertSameSizeOnFrameStack(nextFrame);
 			}
 		}
 
@@ -244,9 +211,13 @@ public class ColorlessBlockGraphBuilder {
 				putFieldNodes.toArray(PutFieldNode[]::new), putStaticNodes.toArray(PutStaticNode[]::new));
 	}
 
-	private Type getType(final ClassPool classPool, final ConstPool constPool, int tagIndex)
-			throws NotFoundException, BadBytecode {
-		int tag = constPool.getTag(tagIndex);
+	private int getCurrentOp() {
+		return methodCodeIterator.byteAt(currentIndex);
+	}
+
+	@SneakyThrows
+	private Type getType(int tagIndex) {
+		int tag = methodConstPool.getTag(tagIndex);
 		Type type;
 		switch (tag) {
 		case ConstPool.CONST_String:
@@ -273,10 +244,21 @@ public class ColorlessBlockGraphBuilder {
 		return type;
 	}
 
-	// TODO: extract to class with fields... too many arguments
 	@SneakyThrows
-	private DataNode processInstruction(final Heap heap, final DataNode[] currentLocals,
-			final Deque<DataNode> currentStack, DataNode toReturn, final List<Invocation> invokations,
+	private Type getTypeOfNextStackTop() {
+		final Frame nextInstructionFrame = methodControlFlow.frameAt(methodCodeIterator.lookAhead());
+		final int topIndex = nextInstructionFrame.getTopIndex();
+		final Type onTopOfStack = nextInstructionFrame.getStack(topIndex);
+		if (onTopOfStack == Type.TOP) {
+			final Type beforeTop = nextInstructionFrame.getStack(topIndex - 1);
+			assert beforeTop.getSize() == 2;
+			return beforeTop;
+		}
+		return onTopOfStack;
+	}
+
+	@SneakyThrows
+	private DataNode processInstruction(final Heap heap, DataNode toReturn, final List<Invocation> invokations,
 			final List<PutFieldNode> putFieldNodes, final List<PutStaticNode> putStaticNodes) {
 
 		int op = getCurrentOp();
@@ -286,7 +268,7 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.ALOAD:
-			currentStack.push(currentLocals[methodCodeIterator.byteAt(index + 1)]);
+			currentStack.push(currentLocals[methodCodeIterator.byteAt(currentIndex + 1)]);
 			break;
 
 		case Opcode.ALOAD_0:
@@ -302,11 +284,11 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.ARRAYLENGTH:
-			processInstructionWithStackOnly(currentStack, 1);
+			processInstructionWithStackOnly(1);
 			break;
 
 		case Opcode.ASTORE:
-			currentLocals[methodCodeIterator.byteAt(index + 1)] = currentStack.pop();
+			currentLocals[methodCodeIterator.byteAt(currentIndex + 1)] = currentStack.pop();
 			break;
 
 		case Opcode.ASTORE_0:
@@ -329,7 +311,7 @@ public class ColorlessBlockGraphBuilder {
 		case Opcode.IALOAD:
 		case Opcode.LALOAD:
 		case Opcode.SALOAD: {
-			processInstructionWithStackOnly(currentStack, 2);
+			processInstructionWithStackOnly(2);
 			break;
 		}
 
@@ -346,15 +328,15 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.BIPUSH:
-			processInstructionWithStackOnly(currentStack, 0);
+			processInstructionWithStackOnly(0);
 			break;
 
 		case Opcode.CHECKCAST:
-			processInstructionWithStackOnly(currentStack, 1);
+			processInstructionWithStackOnly(1);
 			break;
 
 		case Opcode.DLOAD: {
-			final int varIndex = methodCodeIterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(currentIndex + 1);
 			currentStack.push(currentLocals[varIndex]);
 			break;
 		}
@@ -366,7 +348,7 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.DSTORE: {
-			final int varIndex = methodCodeIterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(currentIndex + 1);
 			currentLocals[varIndex] = currentStack.pop();
 			break;
 		}
@@ -382,7 +364,7 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.FLOAD:
-			currentStack.push(currentLocals[methodCodeIterator.byteAt(index + 1)]);
+			currentStack.push(currentLocals[methodCodeIterator.byteAt(currentIndex + 1)]);
 			assert currentStack.peek().type == Type.FLOAT;
 			break;
 
@@ -396,7 +378,7 @@ public class ColorlessBlockGraphBuilder {
 
 		case Opcode.GETFIELD:
 		case Opcode.GETSTATIC: {
-			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
+			int constantIndex = methodCodeIterator.u16bitAt(currentIndex + 1);
 			final String fieldrefClassName = methodConstPool.getFieldrefClassName(constantIndex);
 			final String fieldrefName = methodConstPool.getFieldrefName(constantIndex);
 			final String fieldrefType = methodConstPool.getFieldrefType(constantIndex);
@@ -406,9 +388,9 @@ public class ColorlessBlockGraphBuilder {
 
 			// XXX: USE HEAP
 			if (op == Opcode.GETFIELD) {
-				processInstructionWithStackOnly(currentStack, 1, () -> new GetFieldNode(fieldClass, ctField));
+				processInstructionWithStackOnly(1, () -> new GetFieldNode(fieldClass, ctField));
 			} else {
-				processInstructionWithStackOnly(currentStack, 0, () -> new GetStaticNode(fieldClass, ctField));
+				processInstructionWithStackOnly(0, () -> new GetStaticNode(fieldClass, ctField));
 			}
 			break;
 		}
@@ -423,7 +405,7 @@ public class ColorlessBlockGraphBuilder {
 		case Opcode.I2F:
 		case Opcode.I2L:
 		case Opcode.I2S:
-			processInstructionWithStackOnly(currentStack, 1);
+			processInstructionWithStackOnly(1);
 			break;
 
 		case Opcode.IADD:
@@ -437,7 +419,7 @@ public class ColorlessBlockGraphBuilder {
 		case Opcode.ISUB:
 		case Opcode.IUSHR:
 		case Opcode.IXOR:
-			processInstructionWithStackOnly(currentStack, 2);
+			processInstructionWithStackOnly(2);
 			break;
 
 		case Opcode.ICONST_0:
@@ -473,16 +455,16 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.IINC: {
-			DataNode prevValue = currentLocals[methodCodeIterator.byteAt(index + 1)];
+			DataNode prevValue = currentLocals[methodCodeIterator.byteAt(currentIndex + 1)];
 			DataNode nextValue = new DataNode(
-					InstructionPrinter.instructionString(methodCodeIterator, index, methodConstPool))
+					InstructionPrinter.instructionString(methodCodeIterator, currentIndex, methodConstPool))
 							.setInputs(new DataNode[] { prevValue }).setOperation(op).setType(prevValue.getType());
-			currentLocals[methodCodeIterator.byteAt(index + 1)] = nextValue;
+			currentLocals[methodCodeIterator.byteAt(currentIndex + 1)] = nextValue;
 			break;
 		}
 
 		case Opcode.ILOAD:
-			currentStack.push(currentLocals[methodCodeIterator.byteAt(index + 1)]);
+			currentStack.push(currentLocals[methodCodeIterator.byteAt(currentIndex + 1)]);
 			break;
 		case Opcode.ILOAD_0:
 		case Opcode.ILOAD_1:
@@ -493,18 +475,18 @@ public class ColorlessBlockGraphBuilder {
 
 		case Opcode.INEG:
 		case Opcode.INSTANCEOF: {
-			processInstructionWithStackOnly(currentStack, 1);
+			processInstructionWithStackOnly(1);
 			break;
 		}
 
 		case Opcode.INVOKEDYNAMIC: {
-			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
+			int constantIndex = methodCodeIterator.u16bitAt(currentIndex + 1);
 
 			final int nameAndType = methodConstPool.getInvokeDynamicNameAndType(constantIndex);
 			final String signature = methodConstPool.getUtf8Info(methodConstPool.getNameAndTypeDescriptor(nameAndType));
 
 			final MethodSignature methodSignature = SignatureAttribute.toMethodSignature(signature);
-			processInstructionWithStackOnly(currentStack, methodSignature.getParameterTypes().length);
+			processInstructionWithStackOnly(methodSignature.getParameterTypes().length);
 			break;
 		}
 
@@ -512,7 +494,7 @@ public class ColorlessBlockGraphBuilder {
 		case Opcode.INVOKESPECIAL:
 		case Opcode.INVOKESTATIC:
 		case Opcode.INVOKEVIRTUAL: {
-			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
+			int constantIndex = methodCodeIterator.u16bitAt(currentIndex + 1);
 
 			String className = null;
 			String methodName = null;
@@ -568,7 +550,7 @@ public class ColorlessBlockGraphBuilder {
 		}
 
 		case Opcode.ISTORE:
-			currentLocals[methodCodeIterator.byteAt(index + 1)] = currentStack.pop();
+			currentLocals[methodCodeIterator.byteAt(currentIndex + 1)] = currentStack.pop();
 			break;
 
 		case Opcode.ISTORE_0:
@@ -581,7 +563,7 @@ public class ColorlessBlockGraphBuilder {
 		case Opcode.LADD:
 		case Opcode.LAND:
 		case Opcode.LCMP:
-			processInstructionWithStackOnly(currentStack, 2);
+			processInstructionWithStackOnly(2);
 			break;
 
 		case Opcode.LCONST_0:
@@ -593,11 +575,11 @@ public class ColorlessBlockGraphBuilder {
 
 		case Opcode.LDC:
 		case Opcode.LDC_W: {
-			int tagIndex = op == Opcode.LDC ? methodCodeIterator.byteAt(index + 1)
-					: methodCodeIterator.u16bitAt(index + 1);
+			int tagIndex = op == Opcode.LDC ? methodCodeIterator.byteAt(currentIndex + 1)
+					: methodCodeIterator.u16bitAt(currentIndex + 1);
 			String description = "constant #" + tagIndex;
 
-			Type type = getType(classPool, methodConstPool, tagIndex);
+			Type type = getType(tagIndex);
 			if (type.getCtClass().getName().equals("java.lang.String")) {
 				description = "\"" + methodConstPool.getStringInfo(tagIndex) + "\"";
 			}
@@ -607,12 +589,12 @@ public class ColorlessBlockGraphBuilder {
 		}
 
 		case Opcode.LDC2_W: {
-			int tagIndex = methodCodeIterator.u16bitAt(index + 1);
+			int tagIndex = methodCodeIterator.u16bitAt(currentIndex + 1);
 			String description = "constant #" + tagIndex;
 
-			Type type = getType(classPool, methodConstPool, tagIndex);
+			Type type = getType(tagIndex);
 			if (type.getCtClass().getName().equals("java.lang.String")) {
-				description = "\"" + methodConstPool.getUtf8Info(index) + "\"";
+				description = "\"" + methodConstPool.getUtf8Info(currentIndex) + "\"";
 			}
 
 			currentStack.push(new DataNode(description).setType(type));
@@ -620,7 +602,7 @@ public class ColorlessBlockGraphBuilder {
 		}
 
 		case Opcode.LLOAD: {
-			final int varIndex = methodCodeIterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(currentIndex + 1);
 			currentStack.push(currentLocals[varIndex]);
 			break;
 		}
@@ -632,7 +614,7 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.LSTORE: {
-			final int varIndex = methodCodeIterator.byteAt(index + 1);
+			final int varIndex = methodCodeIterator.byteAt(currentIndex + 1);
 			currentLocals[varIndex] = currentStack.pop();
 			break;
 		}
@@ -644,10 +626,10 @@ public class ColorlessBlockGraphBuilder {
 			break;
 
 		case Opcode.NEW:
-			processInstructionWithStackOnly(currentStack, 0);
+			processInstructionWithStackOnly(0);
 			break;
 		case Opcode.NEWARRAY:
-			processInstructionWithStackOnly(currentStack, 1);
+			processInstructionWithStackOnly(1);
 			break;
 
 		case Opcode.POP: {
@@ -667,7 +649,7 @@ public class ColorlessBlockGraphBuilder {
 
 		case Opcode.PUTFIELD:
 		case Opcode.PUTSTATIC: {
-			int constantIndex = methodCodeIterator.u16bitAt(index + 1);
+			int constantIndex = methodCodeIterator.u16bitAt(currentIndex + 1);
 			final String fieldrefClassName = methodConstPool.getFieldrefClassName(constantIndex);
 			final String fieldrefName = methodConstPool.getFieldrefName(constantIndex);
 			final String fieldrefType = methodConstPool.getFieldrefType(constantIndex);
@@ -685,7 +667,7 @@ public class ColorlessBlockGraphBuilder {
 		}
 
 		case Opcode.SIPUSH:
-			int constantValue = methodCodeIterator.u16bitAt(index + 1);
+			int constantValue = methodCodeIterator.u16bitAt(currentIndex + 1);
 			currentStack.push(new DataNode("shoart as int " + constantValue).setOperation(op).setType(Type.INTEGER));
 			break;
 
@@ -700,8 +682,19 @@ public class ColorlessBlockGraphBuilder {
 		return toReturn;
 	}
 
-	private int getCurrentOp() {
-		return methodCodeIterator.byteAt(index);
+	private void processInstructionWithStackOnly(final int toPoll) {
+		processInstructionWithStackOnly(toPoll, () -> new DataNode(
+				InstructionPrinter.instructionString(methodCodeIterator, currentIndex, methodConstPool)));
+	}
+
+	private void processInstructionWithStackOnly(final int toPoll, Supplier<DataNode> resultTypeSupplier) {
+		DataNode result = resultTypeSupplier.get().setOperation(getCurrentOp()).setType(getTypeOfNextStackTop());
+		DataNode[] inputs = new DataNode[toPoll];
+		for (int i = 0; i < toPoll; i++) {
+			inputs[i] = currentStack.pop();
+		}
+		result.inputs = inputs;
+		currentStack.push(result);
 	}
 
 }

@@ -190,7 +190,7 @@ public class ColorlessMethodGraphBuilder {
 		}
 
 		BlockDataGraph blockGraph = new ColorlessBlockGraphBuilder(classPool, methodCodeIterator, methodConstPool,
-				methodControlFlow, block).buildGraph(incLocalNodes, incStackNodes);
+				methodControlFlow, block, incLocalNodes, incStackNodes).buildGraph();
 		done.put(key, blockGraph);
 
 		for (int e = 0; e < block.exits(); e++) {
