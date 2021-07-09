@@ -22,7 +22,7 @@ class BrushUtils {
 
 	static void copyColor(final @NonNull Map<DataNode, ColoredObject> oldColors, final @NonNull DataNode source,
 			final @NonNull Function<ColoredObject, ColoredObject> colorTransformation, final @NonNull DataNode target,
-			final @NonNull BiConsumer<DataNode, ColoredObject> onTouch) {
+			final @NonNull BiConsumer<DataNode, ColoredObject> colorApplier) {
 		final ColoredObject sourceColor = oldColors.get(source);
 		if (sourceColor == null) {
 			return;
@@ -33,7 +33,7 @@ class BrushUtils {
 
 		if (!newTargetColor.equals(oldTargetColor)) {
 			log.debug("Copying color {} from {} to {} as {}", sourceColor, source, target, newTargetColor);
-			onTouch.accept(target, newTargetColor);
+			colorApplier.accept(target, newTargetColor);
 		}
 	}
 
