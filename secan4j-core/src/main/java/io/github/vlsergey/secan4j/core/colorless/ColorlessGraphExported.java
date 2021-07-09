@@ -102,7 +102,7 @@ public class ColorlessGraphExported {
 						continue;
 					}
 
-					final Optional<BlockDataGraph> opGraph = new ColorlessGraphBuilder(classPool, ctClass, ctMethod)
+					final Optional<BlockDataGraph> opGraph = new ColorlessMethodGraphBuilder(classPool, ctClass, ctMethod)
 							.buildGraph();
 					if (opGraph.isEmpty() || (opGraph.get().getMethodReturnNodes().length == 0
 							&& opGraph.get().getInvokations().length == 0))

@@ -12,7 +12,7 @@ import java.util.function.BiConsumer;
 
 import io.github.vlsergey.secan4j.core.colored.brushes.ColorPaintBrush;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
-import io.github.vlsergey.secan4j.core.colorless.ColorlessGraphBuilder;
+import io.github.vlsergey.secan4j.core.colorless.ColorlessMethodGraphBuilder;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import javassist.CtBehavior;
 import javassist.CtClass;
@@ -40,7 +40,7 @@ public class GraphColorer {
 	private @NonNull Optional<InitialColoredMethodGraph> buildInitialColoredMethodGraph(final @NonNull CtClass ctClass,
 			final @NonNull CtBehavior ctMethod,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
-		final @NonNull Optional<BlockDataGraph> opColorlessGraph = new ColorlessGraphBuilder(ctClass.getClassPool(),
+		final @NonNull Optional<BlockDataGraph> opColorlessGraph = new ColorlessMethodGraphBuilder(ctClass.getClassPool(),
 				ctClass, ctMethod).buildGraph();
 		if (opColorlessGraph.isEmpty()) {
 			return Optional.empty();
