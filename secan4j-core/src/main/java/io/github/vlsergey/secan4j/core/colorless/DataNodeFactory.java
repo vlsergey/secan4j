@@ -1,5 +1,9 @@
 package io.github.vlsergey.secan4j.core.colorless;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
 import javassist.CtClass;
 import javassist.CtField;
 import javassist.bytecode.InstructionPrinter;
@@ -29,6 +33,8 @@ public class DataNodeFactory {
 	private final @NonNull ColorlessBlockGraphBuilder blockGraphBuilder;
 
 	private final @NonNull NodeCollectors nodeCollectors;
+
+	private final Map<SourceCodePosition, SourceCodePosition> uniquePositions = new HashMap<>();
 
 	public DataNode newDataNode() {
 		final DataNode result = new DataNode();
@@ -74,5 +80,12 @@ public class DataNodeFactory {
 			dataNode.description = InstructionPrinter.instructionString(blockGraphBuilder.getMethodCodeIterator(),
 					blockGraphBuilder.getCurrentIndex(), blockGraphBuilder.getMethodConstPool());
 		}
+
+		SourceCodePosition sourceCodePosition = new SourceCodePosition(
+				blockGraphBuilder.getCtClass().getName().intern(), blockGraphBuilder.getMethodInfo().getName().intern(),
+				blockGraphBuilder.getCurrentLineNumber());
+		sourceCodePosition = uniquePositions.computeIfAbsent(sourceCodePosition, Function.identity());
+
+		dataNode.setSourceCodePosition(sourceCodePosition);
 	}
 }

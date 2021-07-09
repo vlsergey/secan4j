@@ -15,10 +15,12 @@ import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtField;
 import javassist.bytecode.BadBytecode;
+import javassist.bytecode.CodeAttribute;
 import javassist.bytecode.CodeIterator;
 import javassist.bytecode.ConstPool;
 import javassist.bytecode.Descriptor;
 import javassist.bytecode.InstructionPrinter;
+import javassist.bytecode.MethodInfo;
 import javassist.bytecode.Mnemonic;
 import javassist.bytecode.Opcode;
 import javassist.bytecode.SignatureAttribute;
@@ -58,6 +60,7 @@ public class ColorlessBlockGraphBuilder {
 	private static boolean TRACE = false;
 
 	private final @NonNull Block block;
+	private final @NonNull CtClass ctClass;
 	private final @NonNull ClassPool classPool;
 	private int currentIndex = -1;
 	private final DataNode[] currentLocals;
@@ -65,19 +68,30 @@ public class ColorlessBlockGraphBuilder {
 	private final @NonNull DataNodeFactory dataNodeFactory;
 	private final @NonNull DataNode[] incLocalNodes;
 	private final @NonNull Deque<DataNode> incStack;
-	private final @NonNull CodeIterator methodCodeIterator;
-	private final @NonNull ConstPool methodConstPool;
+	private final CodeAttribute methodCodeAttribute;
+	private final CodeIterator methodCodeIterator;
+	private final ConstPool methodConstPool;
 	private final @NonNull ControlFlow methodControlFlow;
+	private final @NonNull MethodInfo methodInfo;
 	private final Set<DataNode> setOfAllNodes = new LinkedHashSet<>();
 
-	public ColorlessBlockGraphBuilder(final @NonNull ClassPool classPool,
-			final @NonNull CodeIterator methodCodeIterator, final @NonNull ConstPool methodConstPool,
-			final @NonNull ControlFlow methodControlFlow, final @NonNull Block block,
-			final @NonNull DataNode[] incLocalNodes, final @NonNull Deque<DataNode> incStack) {
+	public ColorlessBlockGraphBuilder(final @NonNull ClassPool classPool, final @NonNull CtClass ctClass,
+			final @NonNull MethodInfo methodInfo, final @NonNull ControlFlow methodControlFlow,
+			final @NonNull Block block, final @NonNull DataNode[] incLocalNodes,
+			final @NonNull Deque<DataNode> incStack) {
 		super();
 		this.classPool = classPool;
-		this.methodCodeIterator = methodCodeIterator;
-		this.methodConstPool = methodConstPool;
+		this.ctClass = ctClass;
+		this.methodInfo = methodInfo;
+
+		this.methodCodeAttribute = methodInfo.getCodeAttribute();
+		if (methodCodeAttribute != null) {
+			this.methodCodeIterator = methodCodeAttribute.iterator();
+			this.methodConstPool = methodCodeAttribute.getConstPool();
+		} else {
+			this.methodCodeIterator = null;
+			this.methodConstPool = null;
+		}
 		this.methodControlFlow = methodControlFlow;
 
 		this.block = block;
@@ -190,6 +204,17 @@ public class ColorlessBlockGraphBuilder {
 				invokations.toArray(Invocation[]::new), DataNode.EMPTY_DATA_NODES, DataNode.EMPTY_DATA_NODES,
 				currentLocals, toReturn == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { toReturn }, currentStack,
 				putFieldNodes.toArray(PutFieldNode[]::new), putStaticNodes.toArray(PutStaticNode[]::new));
+	}
+
+	/**
+	 * Returns the line number of the source line corresponding to the current
+	 * bytecode position contained in current method.
+	 * 
+	 * @return -1 if this information is not available.
+	 * @see MethodInfo#getLineNumber(int)i
+	 */
+	int getCurrentLineNumber() {
+		return this.methodInfo.getLineNumber(this.currentIndex);
 	}
 
 	int getCurrentOp() {

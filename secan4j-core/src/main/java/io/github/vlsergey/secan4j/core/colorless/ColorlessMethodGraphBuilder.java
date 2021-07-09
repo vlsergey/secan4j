@@ -19,9 +19,6 @@ import javassist.CtBehavior;
 import javassist.CtClass;
 import javassist.Modifier;
 import javassist.NotFoundException;
-import javassist.bytecode.CodeAttribute;
-import javassist.bytecode.CodeIterator;
-import javassist.bytecode.ConstPool;
 import javassist.bytecode.analysis.ControlFlow;
 import javassist.bytecode.analysis.ControlFlow.Block;
 import javassist.bytecode.analysis.ControlFlow.Node;
@@ -87,9 +84,6 @@ public class ColorlessMethodGraphBuilder {
 	private final @NonNull CtClass ctClass;
 	private final @NonNull CtBehavior ctMethod;
 	private final @NonNull Block[] methodBasicBlocks;
-	private final @NonNull CodeAttribute methodCodeAttribute;
-	private final @NonNull CodeIterator methodCodeIterator;
-	private final @NonNull ConstPool methodConstPool;
 	private final @NonNull ControlFlow methodControlFlow;
 
 	@SneakyThrows
@@ -101,15 +95,6 @@ public class ColorlessMethodGraphBuilder {
 
 		this.methodControlFlow = new ControlFlow(ctClass, ctMethod.getMethodInfo());
 		this.methodBasicBlocks = methodControlFlow.basicBlocks();
-
-		this.methodCodeAttribute = ctMethod.getMethodInfo2().getCodeAttribute();
-		if (methodCodeAttribute != null) {
-			this.methodConstPool = methodCodeAttribute.getConstPool();
-			this.methodCodeIterator = methodCodeAttribute.iterator();
-		} else {
-			this.methodConstPool = null;
-			this.methodCodeIterator = null;
-		}
 	}
 
 	@SneakyThrows
@@ -189,7 +174,7 @@ public class ColorlessMethodGraphBuilder {
 			return;
 		}
 
-		BlockDataGraph blockGraph = new ColorlessBlockGraphBuilder(classPool, methodCodeIterator, methodConstPool,
+		BlockDataGraph blockGraph = new ColorlessBlockGraphBuilder(classPool, ctClass, ctMethod.getMethodInfo(),
 				methodControlFlow, block, incLocalNodes, incStackNodes).buildGraph();
 		done.put(key, blockGraph);
 

@@ -11,5 +11,5 @@ public class SourceCodePosition {
 	private final @NonNull String className;
 	private final @NonNull String methodName;
 	private final int sourceLine;
-	private final int sourceOffset;
+
 }
