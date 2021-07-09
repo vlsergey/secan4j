@@ -7,7 +7,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -200,7 +200,7 @@ public class ColorlessGraphBuilder {
 			counter += rootFrame.getLocal(counter).getSize();
 		}
 
-		final Map<BlockDataGraphKey, BlockDataGraph> done = new HashMap<>();
+		final Map<BlockDataGraphKey, BlockDataGraph> done = new LinkedHashMap<>();
 		final int[] blockEnters = new int[basicBlocks.length];
 		buildGraphRecursively(ctClass, ctMethod, controlFlow, done, rootNode.block(), incLocalNodes, EMPTY_STACK,
 				blockEnters);
