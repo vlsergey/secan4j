@@ -39,8 +39,7 @@ final class ImplicitMethodParameterColor implements TraceItem {
 		description.put("methodSignature", methodSignature);
 		description.put("parameterIndex", parameterIndex);
 
-		description.put("message", prefixOfMessage + " argument #" + parameterIndex + " of method '" + methodName
-				+ "' of class " + className);
+		description.put("message", getMessage());
 		return description;
 	}
 
@@ -50,8 +49,14 @@ final class ImplicitMethodParameterColor implements TraceItem {
 	}
 
 	@Override
+	public String getMessage() {
+		return prefixOfMessage + " argument #" + parameterIndex + " of method '" + methodName + "' of class "
+				+ className;
+	}
+
+	@Override
 	public String toString() {
-		return "MethodParameterTraceItem [" + (String) describe().get("message") + "]";
+		return "MethodParameterTraceItem [" + getMessage() + "]";
 	}
 
 }

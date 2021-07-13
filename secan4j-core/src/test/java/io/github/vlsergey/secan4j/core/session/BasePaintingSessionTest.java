@@ -1,10 +1,8 @@
 package io.github.vlsergey.secan4j.core.session;
 
-import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Arrays;
-import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -28,19 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 class BasePaintingSessionTest {
-
-	protected static final TraceItem testTraceItem = new TraceItem() {
-
-		@Override
-		public Map<String, ?> describe() {
-			return singletonMap("description", "test source");
-		}
-
-		@Override
-		public TraceItem findPrevious() {
-			return null;
-		}
-	};
 
 	protected static CtBehavior getCtMethod(final CtClass ctClass, final String methodName, final String signature) {
 		try {
@@ -81,7 +66,7 @@ class BasePaintingSessionTest {
 		for (int i = 0; i < colors.length; i++) {
 			inObjects[i] = colors[i] == null ? null
 					: ColoredObject.forRootOnly(classes[i],
-							new PaintedColor(Confidence.EXPLICITLY, testTraceItem, colors[i]));
+							new PaintedColor(Confidence.EXPLICITLY, TestTraceItem.INSTANCE, colors[i]));
 		}
 		return inObjects;
 	}

@@ -1,11 +1,11 @@
 package io.github.vlsergey.secan4j.core.colored.brushes;
 
-import static java.util.Collections.singletonMap;
-
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
@@ -16,9 +16,11 @@ import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
 import io.github.vlsergey.secan4j.core.colorless.Invocation;
+import io.github.vlsergey.secan4j.core.colorless.SourceCodePosition;
 import io.github.vlsergey.secan4j.data.DataProvider;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NonNull;
 
 /**
@@ -30,10 +32,16 @@ public class CopierBrush implements ColorPaintBrush {
 
 	@Data
 	private static final class CopyTraceItem implements TraceItem {
-		private final TraceItem src;
 
-		private CopyTraceItem(TraceItem src) {
+		@Getter
+		private final SourceCodePosition sourceCodePosition;
+		private final TraceItem src;
+		private final String message;
+
+		private CopyTraceItem(final TraceItem src, final SourceCodePosition sourceCodePosition, final String message) {
 			this.src = src;
+			this.sourceCodePosition = sourceCodePosition;
+			this.message = message;
 		}
 
 		@Override
@@ -41,10 +49,6 @@ public class CopierBrush implements ColorPaintBrush {
 			return src;
 		}
 
-		@Override
-		public Map<String, ?> describe() {
-			return singletonMap("message", "Copy attributes");
-		}
 	}
 
 	private final @NonNull DataProvider dataProvider;
@@ -66,13 +70,15 @@ public class CopierBrush implements ColorPaintBrush {
 			if (forMethodResult.contains(CopyAttributesTo.class) || Arrays.stream(forMethodArguments)
 					.anyMatch(s -> s != null && s.contains(CopyAttributesTo.class))) {
 				// yes, we have copy-colors annotation
-				List<DataNode> sources = new ArrayList<>(1);
-				List<DataNode> targets = new ArrayList<>(1);
+				List<Entry<DataNode, String>> sources = new ArrayList<>(1);
+				List<Entry<DataNode, String>> targets = new ArrayList<>(1);
 				if (forMethodResult.contains(CopyAttributesFrom.class)) {
-					sources.addAll(Arrays.asList(invocation.getResults()));
+					Arrays.stream(invocation.getResults()).map(dn -> new SimpleEntry<>(dn, "result"))
+							.forEach(sources::add);
 				}
 				if (forMethodResult.contains(CopyAttributesTo.class)) {
-					targets.addAll(Arrays.asList(invocation.getResults()));
+					Arrays.stream(invocation.getResults()).map(dn -> new SimpleEntry<>(dn, "result"))
+							.forEach(targets::add);
 				}
 				for (int i = 0; i < Math.min(invocation.getParameters().length, forMethodArguments.length); i++) {
 					final Set<Class<?>> forArg = forMethodArguments[i];
@@ -80,18 +86,27 @@ public class CopierBrush implements ColorPaintBrush {
 						continue;
 					}
 					if (forArg.contains(CopyAttributesFrom.class)) {
-						sources.add(invocation.getParameters()[i]);
+						sources.add(new SimpleEntry<>(invocation.getParameters()[i], "arg" + i));
 					}
 					if (forArg.contains(CopyAttributesTo.class)) {
-						targets.add(invocation.getParameters()[i]);
+						targets.add(new SimpleEntry<>(invocation.getParameters()[i], "arg" + i));
 					}
 				}
 
 				assert sources.size() == 1 : "sources.size() != 1 (NYI)";
 				assert targets.size() == 1 : "targets.size() != 1 (NYI)";
 
-				BrushUtils.copyColor(oldColors, sources.get(0),
-						color -> color.withNewTraceItem(src -> new CopyTraceItem(src)), targets.get(0), onTouch);
+				final Entry<DataNode, String> srcEntry = sources.get(0);
+				final Entry<DataNode, String> dstEntry = targets.get(0);
+
+				BrushUtils
+						.copyColor(oldColors, srcEntry.getKey(),
+								color -> color.withNewTraceItem(src -> new CopyTraceItem(src,
+										invocation.getCallSourceCodePosition(),
+										"Copy attribute from " + srcEntry.getValue() + " to " + dstEntry.getValue()
+												+ " of method " + invocation.getClassName() + "."
+												+ invocation.getMethodName() + "(…)")),
+								dstEntry.getKey(), onTouch);
 			}
 		}
 	}

@@ -77,7 +77,7 @@ public class Secan4j {
 												+ ":" + scp.getMethodName() + ":" + scp.getSourceLine())
 										.orElse("(no source code position)"));
 								builder.append(" ");
-								builder.append(traceItem.toString());
+								builder.append(traceItem.getMessage());
 								return builder.toString();
 							}).collect(joining("\n")));
 				});

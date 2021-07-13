@@ -6,6 +6,7 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class Invocation {
+	private final SourceCodePosition callSourceCodePosition;
 	private final String className;
 	private final String methodName;
 	private final String methodSignature;

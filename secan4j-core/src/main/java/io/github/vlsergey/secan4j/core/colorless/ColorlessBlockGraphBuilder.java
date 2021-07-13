@@ -543,8 +543,9 @@ public class ColorlessBlockGraphBuilder {
 				currentStack.push(result);
 			}
 
-			invokations.add(new Invocation(className, methodName, signature, inputsArray,
-					result == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { result }, op == Opcode.INVOKESTATIC));
+			invokations.add(new Invocation(dataNodeFactory.getCurrentSourceCodePosition(), className, methodName,
+					signature, inputsArray, result == null ? DataNode.EMPTY_DATA_NODES : new DataNode[] { result },
+					op == Opcode.INVOKESTATIC));
 			break;
 		}
 

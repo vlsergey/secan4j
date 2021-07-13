@@ -1,5 +1,7 @@
 package io.github.vlsergey.secan4j.core.colored;
 
+import static java.util.Collections.singletonMap;
+
 import java.util.Map;
 
 import javax.annotation.Nullable;
@@ -9,15 +11,16 @@ import lombok.NonNull;
 
 public interface TraceItem {
 
-	@NonNull
-	Map<String, ?> describe();
+	default @NonNull Map<String, ?> describe() {
+		return singletonMap("message", getMessage());
+	}
 
 	@Nullable
 	TraceItem findPrevious();
 
 	@Nullable
-	default SourceCodePosition getSourceCodePosition() {
-		return null;
-	}
+	SourceCodePosition getSourceCodePosition();
+
+	String getMessage();
 
 }

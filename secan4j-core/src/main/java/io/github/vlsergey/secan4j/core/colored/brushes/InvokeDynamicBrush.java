@@ -1,7 +1,5 @@
 package io.github.vlsergey.secan4j.core.colored.brushes;
 
-import static java.util.Collections.singletonMap;
-
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -33,8 +31,8 @@ public class InvokeDynamicBrush implements ColorPaintBrush {
 		private final @NonNull SourceCodePosition sourceCodePosition;
 
 		@Override
-		public Map<String, ?> describe() {
-			return singletonMap("message", "Result of invokeDynamic operation");
+		public String getMessage() {
+			return "Result of invokeDynamic operation";
 		}
 
 		@Override
