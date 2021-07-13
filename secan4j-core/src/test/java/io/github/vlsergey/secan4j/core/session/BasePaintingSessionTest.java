@@ -3,19 +3,13 @@ package io.github.vlsergey.secan4j.core.session;
 import static java.util.Collections.singletonMap;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
 import javax.annotation.Nullable;
-
-import org.junit.jupiter.api.BeforeEach;
 
 import io.github.vlsergey.secan4j.core.colored.ColorType;
 import io.github.vlsergey.secan4j.core.colored.ColoredObject;
@@ -28,7 +22,6 @@ import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.Modifier;
 import javassist.NotFoundException;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -103,30 +96,25 @@ class BasePaintingSessionTest {
 
 	protected final ClassPool classPool = ClassPool.getDefault();
 
-	@Getter(AccessLevel.PROTECTED)
-	private List<Entry<TraceItem, TraceItem>> intersections;
-
-	@NonNull
-	protected final BiConsumer<TraceItem, TraceItem> onIntersection = (source, sink) -> {
-		this.intersections.add(new SimpleEntry<>(source, sink));
-	};
+	@Getter
+	private final IntesectionsCollector intesectionsCollector = new IntesectionsCollector();
 
 	@NonNull
 	protected ColorType[][] analyze(final @NonNull Class<?> cls, final @NonNull String methodName) throws Exception {
-		return analyze(cls, methodName, null, null, null, null, onIntersection);
+		return analyze(cls, methodName, null, null, null, null, intesectionsCollector);
 	}
 
 	@NonNull
 	protected ColorType[][] analyze(final @NonNull Class<?> cls, final @NonNull String methodName,
 			final @Nullable String signature, ColorType[] ins, ColorType[] outs) throws Exception {
-		return analyze(cls, methodName, signature, ins, outs, null, onIntersection);
+		return analyze(cls, methodName, signature, ins, outs, null, intesectionsCollector);
 	}
 
 	@NonNull
 	protected ColorType[][] analyze(final @NonNull Class<?> cls, final @NonNull String methodName,
 			final @Nullable String signature, @Nullable ColorType[] ins, @Nullable ColorType[] outs,
 			@Nullable Class<?>[] inTypes) throws Exception {
-		return analyze(cls, methodName, signature, ins, outs, inTypes, onIntersection);
+		return analyze(cls, methodName, signature, ins, outs, inTypes, intesectionsCollector);
 	}
 
 	@NonNull
@@ -144,7 +132,7 @@ class BasePaintingSessionTest {
 		}
 
 		PaintingSession paintingSession = new PaintingSession(classPool,
-				onSourceSinkIntersection == null ? onIntersection : onSourceSinkIntersection);
+				onSourceSinkIntersection == null ? intesectionsCollector : onSourceSinkIntersection);
 
 		final CtClass[] actualInTypes;
 		if (!(ctBehavior instanceof CtMethod) || !Modifier.isStatic(((CtMethod) ctBehavior).getModifiers())) {
@@ -170,11 +158,6 @@ class BasePaintingSessionTest {
 								: toColoredObjects(new CtClass[] { ((CtMethod) ctBehavior).getReturnType() }, outs));
 
 		return toColorType(analyzeResult);
-	}
-
-	@BeforeEach
-	void clearIntesections() {
-		this.intersections = new ArrayList<>();
 	}
 
 }

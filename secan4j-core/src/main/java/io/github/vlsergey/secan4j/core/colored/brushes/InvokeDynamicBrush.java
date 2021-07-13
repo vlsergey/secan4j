@@ -13,9 +13,11 @@ import io.github.vlsergey.secan4j.core.colored.PaintedColor;
 import io.github.vlsergey.secan4j.core.colored.TraceItem;
 import io.github.vlsergey.secan4j.core.colorless.BlockDataGraph;
 import io.github.vlsergey.secan4j.core.colorless.DataNode;
+import io.github.vlsergey.secan4j.core.colorless.SourceCodePosition;
 import javassist.bytecode.Opcode;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NonNull;
 
 @AllArgsConstructor
@@ -26,6 +28,9 @@ public class InvokeDynamicBrush implements ColorPaintBrush {
 	private static final class InvokeDynamicTraceItem implements TraceItem {
 
 		private final @NonNull TraceItem previous;
+
+		@Getter
+		private final @NonNull SourceCodePosition sourceCodePosition;
 
 		@Override
 		public Map<String, ?> describe() {
@@ -55,11 +60,12 @@ public class InvokeDynamicBrush implements ColorPaintBrush {
 							continue;
 						}
 
-						colorApplier.accept(node,
-								ColoredObject.forRootOnly(node.getType().getCtClass(),
-										new PaintedColor(Confidence.ASSUMED,
-												new InvokeDynamicTraceItem(oldColor.getColor().getSrc()),
-												ColorType.SourceData)));
+						final InvokeDynamicTraceItem traceItem = new InvokeDynamicTraceItem(
+								oldColor.getColor().getSrc(), node.getSourceCodePosition());
+						final ColoredObject newColor = ColoredObject.forRootOnly(node.getType().getCtClass(),
+								new PaintedColor(Confidence.ASSUMED, traceItem, ColorType.SourceData));
+
+						colorApplier.accept(node, newColor);
 					}
 				});
 	}

@@ -29,7 +29,7 @@ class SimpleColoredMethodsTest extends BasePaintingSessionTest {
 		assertArrayEquals(new ColorType[][] { { null, null, Intersection }, { null } },
 				analyze(SimpleColoredMethods.class, "prepareStatement"));
 
-		assertEquals(1, this.getIntersections().size());
+		assertEquals(1, this.getIntesectionsCollector().getTraces().size());
 	}
 
 }

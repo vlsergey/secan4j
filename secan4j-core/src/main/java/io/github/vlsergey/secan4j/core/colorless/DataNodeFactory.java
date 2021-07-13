@@ -81,9 +81,8 @@ public class DataNodeFactory {
 					blockGraphBuilder.getCurrentIndex(), blockGraphBuilder.getMethodConstPool());
 		}
 
-		SourceCodePosition sourceCodePosition = new SourceCodePosition(
-				blockGraphBuilder.getCtClass().getName().intern(), blockGraphBuilder.getMethodInfo().getName().intern(),
-				blockGraphBuilder.getCurrentLineNumber());
+		SourceCodePosition sourceCodePosition = new SourceCodePosition(blockGraphBuilder.getCtClass().getName(),
+				blockGraphBuilder.getMethodInfo().getName(), blockGraphBuilder.getCurrentLineNumber());
 		sourceCodePosition = uniquePositions.computeIfAbsent(sourceCodePosition, Function.identity());
 
 		dataNode.setSourceCodePosition(sourceCodePosition);

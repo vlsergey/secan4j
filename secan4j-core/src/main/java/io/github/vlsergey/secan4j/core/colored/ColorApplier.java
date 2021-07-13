@@ -28,7 +28,13 @@ public class ColorApplier implements BiConsumer<DataNode, ColoredObject> {
 	public ColorApplier(final @NonNull Map<DataNode, ColoredObject> oldColors,
 			final @NonNull BiConsumer<TraceItem, TraceItem> onSourceSinkIntersection) {
 		this.oldColors = oldColors;
-		this.problemsReporter = (a, b) -> onSourceSinkIntersection.accept(a.getSrc(), b.getSrc());
+		this.problemsReporter = (a, b) -> {
+			if (a.getType() == ColorType.SinkData) {
+				onSourceSinkIntersection.accept(b.getSrc(), a.getSrc());
+			} else {
+				onSourceSinkIntersection.accept(a.getSrc(), b.getSrc());
+			}
+		};
 	}
 
 	@Override

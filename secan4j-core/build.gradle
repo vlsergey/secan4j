@@ -35,6 +35,7 @@ dependencies {
     implementation group: 'com.google.guava', name: 'guava', version: '30.1.1-jre'
     implementation group: 'info.picocli', name: 'picocli', version: '4.6.1'
     implementation group: 'org.javassist', name: 'javassist', version: '3.28.0-GA'
+    implementation group: 'org.reflections', name: 'reflections', version: '0.9.12'
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.31'
 
     testAnnotationProcessor group: 'org.projectlombok', name: 'lombok', version: lombokVersion
